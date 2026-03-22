@@ -26,6 +26,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 16px;
 }
 
 .title {
@@ -70,58 +71,33 @@
   fill: rgba(255, 255, 255, 0.15);
   stroke: #4a9eff;
   stroke-width: 1.5;
+  transition: fill 0.2s ease;
+}
+
+.countryPathFilled {
+  fill: #4a9eff;
 }
 
 .content {
   flex: 1;
   padding: 24px;
   overflow-y: auto;
+  scrollbar-color: rgba(255, 255, 255, 0.4) rgba(255, 255, 255, 0.08);
 }
 
-.sectionTitle {
-  margin: 0 0 16px;
-  font-size: 16px;
-  color: #94a3b8;
-  font-weight: 600;
+.content::-webkit-scrollbar {
+  width: 8px;
 }
 
-.emptyText {
-  color: #64748b;
-  margin: 0;
+.content::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.08);
 }
 
-.list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.listItem {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.checkbox {
-  appearance: none;
-  -webkit-appearance: none;
-  width: 20px;
-  height: 20px;
-  min-width: 20px;
-  min-height: 20px;
-  flex-shrink: 0;
-  margin: 0;
-  border: 2px solid #64748b;
+.content::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.4);
   border-radius: 4px;
-  cursor: pointer;
-  box-sizing: border-box;
-  background-size: contain;
 }
 
-.label {
-  color: #e2e8f0;
-  cursor: pointer;
-  flex: 1;
+.content::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.6);
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Globe from "react-globe.gl";
 import CountryModal from "./CountryModal";
 import { scaleSequentialSqrt } from "d3-scale";
@@ -9,6 +9,21 @@ import type {
   CountryWithGeometry,
   PolygonCoords,
 } from "../types/country";
+
+const VISITED_COUNTRIES_KEY = "travel-tracker-visited-countries";
+
+function getVisitedCountries(): Set<string> {
+  try {
+    const stored = localStorage.getItem(VISITED_COUNTRIES_KEY);
+    return stored ? new Set(JSON.parse(stored)) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+function saveVisitedCountries(visited: Set<string>) {
+  localStorage.setItem(VISITED_COUNTRIES_KEY, JSON.stringify([...visited]));
+}
 
 const getPolygonBounds = (polygon: PolygonCoords) => {
   const ring = polygon[0] ?? [];
@@ -37,6 +52,20 @@ export default function GlobeMap() {
   const [hoverD, setHoverD] = useState<CountryFeature | undefined>();
   const [isUserPlanet, setIsUserPlanet] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState<CountryWithGeometry | null>(null);
+  const [visitedCountries, setVisitedCountries] = useState<Set<string>>(getVisitedCountries);
+
+  const toggleCountryVisited = useCallback((code: string) => {
+    setVisitedCountries((prev) => {
+      const next = new Set(prev);
+      if (next.has(code)) {
+        next.delete(code);
+      } else {
+        next.add(code);
+      }
+      saveVisitedCountries(next);
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     fetch("/datasets/ne_110m_admin_0_countries.geojson")
@@ -115,9 +144,15 @@ export default function GlobeMap() {
         polygonsData={polygonsData}
         polygonAltitude={(d: object) => (d === hoverD ? 0.06 : 0.01)}
         polygonCapColor={(d: object) => {
-          if (isUserPlanet) return d === hoverD ? "#94c5ff" : "#ffffff";
+          const feat = d as CountryFeature;
+          const code = feat.properties.ISO_A2;
+          const isVisited = visitedCountries.has(code);
+          if (isUserPlanet) {
+            if (isVisited) return "#4a9eff";
+            return d === hoverD ? "#94c5ff" : "#ffffff";
+          }
           if (d === hoverD) return "steelblue";
-          return colorScale(getVal(d as CountryFeature));
+          return colorScale(getVal(feat));
         }}
         polygonSideColor={() =>
           isUserPlanet ? "rgba(255, 255, 255, 0.3)" : "rgba(30, 30, 30, 0.15)"
@@ -171,6 +206,10 @@ export default function GlobeMap() {
         <CountryModal
           country={selectedCountry}
           onClose={() => setSelectedCountry(null)}
+          isCountryVisited={visitedCountries.has(selectedCountry.properties.ISO_A2)}
+          onToggleCountryVisited={() =>
+            toggleCountryVisited(selectedCountry.properties.ISO_A2)
+          }
         />
       )}
     </div>

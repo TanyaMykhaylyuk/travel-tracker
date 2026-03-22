@@ -6,8 +6,6 @@ import type { CountryWithGeometry } from "../../types/country";
 import styles from "./CountryModal.module.css";
 
 const STORAGE_KEY = "travel-tracker-visited";
-const CHECK_ICON =
-  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3'%3E%3Cpath d='M5 12l5 5L20 7'/%3E%3C/svg%3E\")";
 
 function getVisited(): Set<string> {
   try {
@@ -29,9 +27,16 @@ function makeKey(countryCode: string, landmarkId: string) {
 type Props = {
   country: CountryWithGeometry;
   onClose: () => void;
+  isCountryVisited: boolean;
+  onToggleCountryVisited: () => void;
 };
 
-export default function CountryModal({ country, onClose }: Props) {
+export default function CountryModal({
+  country,
+  onClose,
+  isCountryVisited,
+  onToggleCountryVisited,
+}: Props) {
   const code = country.properties.ISO_A2;
   const name = country.properties.ADMIN;
   const landmarks = LANDMARKS_BY_COUNTRY[code] ?? [];
@@ -96,9 +101,33 @@ export default function CountryModal({ country, onClose }: Props) {
     >
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
         <div className={styles.header}>
-          <h2 id="modal-title" className={styles.title}>
-            {name}
-          </h2>
+          <div className="flex flex-col gap-1.5">
+            <h2 id="modal-title" className={styles.title}>
+              {name}
+            </h2>
+            <div className="flex items-center justify-between gap-4 py-1">
+              <div className="flex flex-col">
+                <span className="text-sm font-medium text-white">
+                  Visited
+                </span>
+                <span className="text-xs text-slate-400">
+                  Mark this country as visited
+                </span>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={isCountryVisited}
+                aria-label="Color country on map"
+                onClick={onToggleCountryVisited}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 focus:ring-offset-[#1a1a2e] ${isCountryVisited ? "bg-sky-500" : "bg-slate-600"}`}
+              >
+                <span
+                  className={`pointer-events-none absolute left-0.5 top-0.5 inline-block h-5 w-5 rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isCountryVisited ? "translate-x-5" : "translate-x-0"}`}
+                />
+              </button>
+            </div>
+          </div>
           <button
             type="button"
             className={styles.closeButton}
@@ -118,41 +147,49 @@ export default function CountryModal({ country, onClose }: Props) {
               viewBox="0 0 280 200"
             >
               <path
-                className={styles.countryPath}
+                className={`${styles.countryPath} ${isCountryVisited ? styles.countryPathFilled : ""}`}
                 d={svgPath}
               />
             </svg>
           </div>
 
           <div className={styles.content}>
-            <h3 className={styles.sectionTitle}>Notable places</h3>
             {landmarks.length === 0 ? (
-              <p className={styles.emptyText}>
+              <p className="text-slate-400 text-sm py-4 m-0">
                 No landmarks listed for this country yet.
               </p>
             ) : (
-              <ul className={styles.list}>
-                {landmarks.map((landmark) => (
-                  <li key={landmark.id} className={styles.listItem}>
-                    <input
-                      type="checkbox"
-                      id={`${code}-${landmark.id}`}
-                      checked={isVisited(landmark)}
-                      onChange={() => toggleVisited(landmark)}
-                      className={styles.checkbox}
-                      style={{
-                        background: isVisited(landmark) ? "#4a9eff" : "transparent",
-                        backgroundImage: isVisited(landmark) ? CHECK_ICON : "none",
-                      }}
-                    />
-                    <label
-                      htmlFor={`${code}-${landmark.id}`}
-                      className={styles.label}
-                    >
-                      {landmark.name}
-                    </label>
-                  </li>
-                ))}
+              <ul className="divide-y divide-white/10">
+                {landmarks.map((landmark) => {
+                  const checked = isVisited(landmark);
+                  return (
+                    <li key={landmark.id}>
+                      <label
+                        htmlFor={`${code}-${landmark.id}`}
+                        className="flex cursor-pointer items-center gap-3 py-4"
+                      >
+                        <div className="relative flex h-5 w-5 shrink-0 items-center justify-center">
+                          <input
+                            type="checkbox"
+                            id={`${code}-${landmark.id}`}
+                            checked={checked}
+                            onChange={() => toggleVisited(landmark)}
+                            className="sr-only"
+                          />
+                          <span
+                            className={`absolute inset-0 rounded border ${checked ? "border-transparent bg-black" : "border-slate-500 bg-transparent"}`}
+                          />
+                          {checked && (
+                            <svg className="relative z-10 h-3.5 w-3.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                              <path d="M5 12l5 5L20 7" />
+                            </svg>
+                          )}
+                        </div>
+                        <span className="text-sm font-medium text-white">{landmark.name}</span>
+                      </label>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </div>
