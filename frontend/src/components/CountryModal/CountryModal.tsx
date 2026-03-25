@@ -120,7 +120,7 @@ export default function CountryModal({
                 aria-checked={isCountryVisited}
                 aria-label="Color country on map"
                 onClick={onToggleCountryVisited}
-                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 focus:ring-offset-[#1a1a2e] ${isCountryVisited ? "bg-sky-500" : "bg-slate-600"}`}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-neutral-500 focus:ring-offset-2 focus:ring-offset-[#1a1a1a] ${isCountryVisited ? "bg-neutral-400" : "bg-zinc-600"}`}
               >
                 <span
                   className={`pointer-events-none absolute left-0.5 top-0.5 inline-block h-5 w-5 rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isCountryVisited ? "translate-x-5" : "translate-x-0"}`}
