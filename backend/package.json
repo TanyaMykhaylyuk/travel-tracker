@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "ts-node-dev src/index.ts",
+    "seed:landmarks": "node -r ts-node/register/transpile-only src/scripts/seedLandmarks.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -12,9 +13,11 @@
   "license": "ISC",
   "dependencies": {
     "cors": "^2.8.6",
+    "csv-parse": "^6.2.1",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
-    "mongoose": "^9.3.1"
+    "mongoose": "^9.3.1",
+    "world-countries": "^5.1.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
