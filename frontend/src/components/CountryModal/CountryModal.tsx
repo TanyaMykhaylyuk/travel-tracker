@@ -1,11 +1,16 @@
 import { useMemo, useCallback, useState, useEffect } from "react";
 import { geoPath, geoMercator } from "d3-geo";
 import type { Feature } from "geojson";
-import { LANDMARKS_BY_COUNTRY, type Landmark } from "../../data/landmarks";
 import type { CountryWithGeometry } from "../../types/country";
+import { countryVisitKey } from "../../lib/visitCountryKey";
 import styles from "./CountryModal.module.css";
 
-const STORAGE_KEY = "travel-tracker-visited";
+type Landmark = {
+  id: string;
+  name: string;
+};
+
+const STORAGE_KEY = "travel-tracker-visited-landmarks-v2";
 
 function getVisited(): Set<string> {
   try {
@@ -31,6 +36,10 @@ type Props = {
   onToggleCountryVisited: () => void;
 };
 
+function canQueryLandmarksApi(isoA2: string) {
+  return /^[A-Za-z]{2}$/.test(isoA2);
+}
+
 export default function CountryModal({
   country,
   onClose,
@@ -38,14 +47,41 @@ export default function CountryModal({
   onToggleCountryVisited,
 }: Props) {
   const code = country.properties.ISO_A2;
+  const visitKey = countryVisitKey(country.properties);
   const name = country.properties.ADMIN;
-  const landmarks = LANDMARKS_BY_COUNTRY[code] ?? [];
+  const [landmarks, setLandmarks] = useState<Landmark[]>([]);
+  const [landmarksReady, setLandmarksReady] = useState(false);
 
   const [visited, setVisited] = useState<Set<string>>(() => getVisited());
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      try {
+        const res = canQueryLandmarksApi(code)
+          ? await fetch(`/api/landmarks/country/${encodeURIComponent(code)}`)
+          : await fetch(`/api/landmarks/country/name/${encodeURIComponent(name)}`);
+        if (!res.ok) throw new Error("not found");
+        const data: { landmarks: Landmark[] } = await res.json();
+        if (!cancelled) setLandmarks(data.landmarks ?? []);
+      } catch {
+        if (!cancelled) setLandmarks([]);
+      } finally {
+        if (!cancelled) setLandmarksReady(true);
+      }
+    }
+
+    setLandmarksReady(false);
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [code, name]);
+
   const toggleVisited = useCallback(
     (landmark: Landmark) => {
-      const key = makeKey(code, landmark.id);
+      const key = makeKey(visitKey, landmark.id);
       setVisited((prev) => {
         const next = new Set(prev);
         if (next.has(key)) {
@@ -57,7 +93,7 @@ export default function CountryModal({
         return next;
       });
     },
-    [code]
+    [visitKey]
   );
 
   const svgPath = useMemo(() => {
@@ -79,8 +115,8 @@ export default function CountryModal({
   }, [country.geometry]);
 
   const isVisited = useCallback(
-    (landmark: Landmark) => visited.has(makeKey(code, landmark.id)),
-    [code, visited]
+    (landmark: Landmark) => visited.has(makeKey(visitKey, landmark.id)),
+    [visitKey, visited]
   );
 
   useEffect(() => {
@@ -154,7 +190,9 @@ export default function CountryModal({
           </div>
 
           <div className={styles.content}>
-            {landmarks.length === 0 ? (
+            {!landmarksReady ? (
+              <p className="text-slate-400 text-sm py-4 m-0">Loading landmarks…</p>
+            ) : landmarks.length === 0 ? (
               <p className="text-slate-400 text-sm py-4 m-0">
                 No landmarks listed for this country yet.
               </p>
@@ -165,13 +203,13 @@ export default function CountryModal({
                   return (
                     <li key={landmark.id}>
                       <label
-                        htmlFor={`${code}-${landmark.id}`}
+                        htmlFor={`${visitKey}-${landmark.id}`}
                         className="flex cursor-pointer items-center gap-3 py-4"
                       >
                         <div className="relative flex h-5 w-5 shrink-0 items-center justify-center">
                           <input
                             type="checkbox"
-                            id={`${code}-${landmark.id}`}
+                            id={`${visitKey}-${landmark.id}`}
                             checked={checked}
                             onChange={() => toggleVisited(landmark)}
                             className="sr-only"

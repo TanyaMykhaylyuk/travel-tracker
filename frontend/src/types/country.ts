@@ -1,5 +1,6 @@
 export type CountryProps = {
   ISO_A2: string;
+  ADM0_A3: string;
   ADMIN: string;
   GDP_MD_EST: number;
   POP_EST: number;
