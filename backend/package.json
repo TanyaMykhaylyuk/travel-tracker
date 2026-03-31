@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "ts-node-dev src/index.ts",
     "seed:landmarks": "node -r ts-node/register/transpile-only src/scripts/seedLandmarks.ts",
+    "seed:countries": "node -r ts-node/register/transpile-only src/scripts/seedCountries.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

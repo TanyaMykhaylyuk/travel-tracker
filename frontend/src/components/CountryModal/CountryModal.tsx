@@ -3,6 +3,11 @@ import { geoPath, geoMercator } from "d3-geo";
 import type { Feature } from "geojson";
 import type { CountryWithGeometry } from "../../types/country";
 import { countryVisitKey } from "../../lib/visitCountryKey";
+import {
+  getVisitedLandmarksSet,
+  saveVisitedLandmarksSet,
+} from "../../lib/visitStorage";
+import { getStoredUserId, syncVisitsToServer } from "../../lib/userApi";
 import styles from "./CountryModal.module.css";
 
 type Landmark = {
@@ -10,27 +15,13 @@ type Landmark = {
   name: string;
 };
 
-const STORAGE_KEY = "travel-tracker-visited-landmarks-v2";
-
-function getVisited(): Set<string> {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    return stored ? new Set(JSON.parse(stored)) : new Set();
-  } catch {
-    return new Set();
-  }
-}
-
-function saveVisited(visited: Set<string>) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify([...visited]));
-}
-
 function makeKey(countryCode: string, landmarkId: string) {
   return `${countryCode}:${landmarkId}`;
 }
 
 type Props = {
   country: CountryWithGeometry;
+  visitEpoch: number;
   onClose: () => void;
   isCountryVisited: boolean;
   onToggleCountryVisited: () => void;
@@ -42,6 +33,7 @@ function canQueryLandmarksApi(isoA2: string) {
 
 export default function CountryModal({
   country,
+  visitEpoch,
   onClose,
   isCountryVisited,
   onToggleCountryVisited,
@@ -52,7 +44,11 @@ export default function CountryModal({
   const [landmarks, setLandmarks] = useState<Landmark[]>([]);
   const [landmarksReady, setLandmarksReady] = useState(false);
 
-  const [visited, setVisited] = useState<Set<string>>(() => getVisited());
+  const [visited, setVisited] = useState<Set<string>>(() => getVisitedLandmarksSet());
+
+  useEffect(() => {
+    setVisited(getVisitedLandmarksSet());
+  }, [visitEpoch, visitKey]);
 
   useEffect(() => {
     let cancelled = false;
@@ -89,7 +85,11 @@ export default function CountryModal({
         } else {
           next.add(key);
         }
-        saveVisited(next);
+        saveVisitedLandmarksSet(next);
+        const uid = getStoredUserId();
+        if (uid) {
+          void syncVisitsToServer(uid).catch(() => {});
+        }
         return next;
       });
     },

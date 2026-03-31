@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Globe from "react-globe.gl";
 import CountryModal from "./CountryModal";
+import UserProfilePanel from "./UserProfilePanel";
 import { scaleSequentialSqrt } from "d3-scale";
 import { interpolateYlOrRd } from "d3-scale-chromatic";
 import type {
@@ -9,20 +10,44 @@ import type {
   CountryWithGeometry,
   PolygonCoords,
 } from "../types/country";
+import { countryVisitKey } from "../lib/visitCountryKey";
+import {
+  getVisitedCountriesSet,
+  saveVisitedCountriesSet,
+} from "../lib/visitStorage";
+import {
+  applyServerVisitsToStorage,
+  fetchUser,
+  getStoredUserId,
+  setStoredUserId,
+  syncVisitsToServer,
+} from "../lib/userApi";
 
-const VISITED_COUNTRIES_KEY = "travel-tracker-visited-countries";
-
-function getVisitedCountries(): Set<string> {
-  try {
-    const stored = localStorage.getItem(VISITED_COUNTRIES_KEY);
-    return stored ? new Set(JSON.parse(stored)) : new Set();
-  } catch {
-    return new Set();
+function migrateVisitedCountriesIsoToAdm0(
+  features: CountryFeature[],
+  stored: Set<string>
+): Set<string> {
+  const admSet = new Set(features.map((f) => f.properties.ADM0_A3));
+  const isoToAdm = new Map<string, string>();
+  for (const f of features) {
+    const iso = f.properties.ISO_A2;
+    const adm = f.properties.ADM0_A3;
+    if (/^[A-Za-z]{2}$/.test(iso)) {
+      isoToAdm.set(iso.toUpperCase(), adm);
+    }
   }
-}
-
-function saveVisitedCountries(visited: Set<string>) {
-  localStorage.setItem(VISITED_COUNTRIES_KEY, JSON.stringify([...visited]));
+  const next = new Set<string>();
+  for (const key of stored) {
+    if (admSet.has(key)) {
+      next.add(key);
+      continue;
+    }
+    if (/^[A-Za-z]{2}$/.test(key)) {
+      const adm = isoToAdm.get(key.toUpperCase());
+      if (adm) next.add(adm);
+    }
+  }
+  return next;
 }
 
 const getPolygonBounds = (polygon: PolygonCoords) => {
@@ -52,7 +77,32 @@ export default function GlobeMap() {
   const [hoverD, setHoverD] = useState<CountryFeature | undefined>();
   const [isUserPlanet, setIsUserPlanet] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState<CountryWithGeometry | null>(null);
-  const [visitedCountries, setVisitedCountries] = useState<Set<string>>(getVisitedCountries);
+  const [visitedCountries, setVisitedCountries] = useState<Set<string>>(getVisitedCountriesSet);
+  const [visitEpoch, setVisitEpoch] = useState(0);
+  const [profileOpen, setProfileOpen] = useState(false);
+
+  useEffect(() => {
+    if (!isUserPlanet) setProfileOpen(false);
+  }, [isUserPlanet]);
+
+  useEffect(() => {
+    const id = getStoredUserId();
+    if (!id) return;
+    let cancelled = false;
+    fetchUser(id)
+      .then((user) => {
+        if (cancelled) return;
+        applyServerVisitsToStorage(user);
+        setVisitedCountries(new Set(user.visitedCountries));
+        setVisitEpoch((e) => e + 1);
+      })
+      .catch(() => {
+        setStoredUserId(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const toggleCountryVisited = useCallback((code: string) => {
     setVisitedCountries((prev) => {
@@ -62,17 +112,51 @@ export default function GlobeMap() {
       } else {
         next.add(code);
       }
-      saveVisitedCountries(next);
+      saveVisitedCountriesSet(next);
+      const uid = getStoredUserId();
+      if (uid) {
+        void syncVisitsToServer(uid).catch(() => {});
+      }
       return next;
     });
   }, []);
 
   useEffect(() => {
-    fetch("/datasets/ne_110m_admin_0_countries.geojson")
-      .then((res) => res.json())
-      .then((data: CountriesData) => setCountries(data))
-      .catch(() => setCountries({ features: [] }));
+    async function loadCountries() {
+      try {
+        const res = await fetch("/api/countries");
+        if (res.ok) {
+          const data = (await res.json()) as Partial<CountriesData>;
+          if (Array.isArray(data.features)) {
+            setCountries({ features: data.features });
+            return;
+          }
+        }
+      } catch {}
+
+      try {
+        const local = await fetch("/datasets/ne_110m_admin_0_countries.geojson");
+        const data = (await local.json()) as Partial<CountriesData>;
+        setCountries({ features: Array.isArray(data.features) ? data.features : [] });
+      } catch {
+        setCountries({ features: [] });
+      }
+    }
+
+    void loadCountries();
   }, []);
+
+  useEffect(() => {
+    if (!countries.features.length) return;
+    setVisitedCountries((prev) => {
+      const migrated = migrateVisitedCountriesIsoToAdm0(countries.features, prev);
+      if (migrated.size === prev.size && [...migrated].every((k) => prev.has(k))) {
+        return prev;
+      }
+      saveVisitedCountriesSet(migrated);
+      return migrated;
+    });
+  }, [countries.features]);
 
   const getVal = (feat: CountryFeature) =>
     feat.properties.GDP_MD_EST / Math.max(1e5, feat.properties.POP_EST);
@@ -145,7 +229,7 @@ export default function GlobeMap() {
         polygonAltitude={(d: object) => (d === hoverD ? 0.06 : 0.01)}
         polygonCapColor={(d: object) => {
           const feat = d as CountryFeature;
-          const code = feat.properties.ISO_A2;
+          const code = countryVisitKey(feat.properties);
           const isVisited = visitedCountries.has(code);
           if (isUserPlanet) {
             if (isVisited) return "#4a9eff";
@@ -185,6 +269,22 @@ export default function GlobeMap() {
         }}
         polygonsTransitionDuration={300}
       />
+      {isUserPlanet && (
+        <>
+          <button
+            type="button"
+            onClick={() => setProfileOpen(true)}
+            className="absolute right-6 top-6 z-30 flex h-11 w-11 items-center justify-center rounded-full border border-slate-700 bg-slate-900/90 text-slate-200 shadow-lg backdrop-blur-sm transition hover:bg-slate-800 hover:text-white"
+            aria-label="Open profile"
+          >
+            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+          </button>
+          <UserProfilePanel open={profileOpen} onClose={() => setProfileOpen(false)} />
+        </>
+      )}
       <button
         type="button"
         onClick={() => setIsUserPlanet((prev) => !prev)}
@@ -205,10 +305,13 @@ export default function GlobeMap() {
       {selectedCountry && (
         <CountryModal
           country={selectedCountry}
+          visitEpoch={visitEpoch}
           onClose={() => setSelectedCountry(null)}
-          isCountryVisited={visitedCountries.has(selectedCountry.properties.ISO_A2)}
+          isCountryVisited={visitedCountries.has(
+            countryVisitKey(selectedCountry.properties)
+          )}
           onToggleCountryVisited={() =>
-            toggleCountryVisited(selectedCountry.properties.ISO_A2)
+            toggleCountryVisited(countryVisitKey(selectedCountry.properties))
           }
         />
       )}
