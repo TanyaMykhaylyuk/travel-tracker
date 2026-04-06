@@ -19,7 +19,9 @@ export function setStoredUserId(id: string | null): void {
   try {
     if (id === null) localStorage.removeItem(USER_ID_KEY);
     else localStorage.setItem(USER_ID_KEY, id);
-  } catch {}
+  } catch {
+    void 0;
+  }
 }
 
 export type ServerUser = {

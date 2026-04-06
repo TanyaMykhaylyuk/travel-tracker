@@ -1,23 +1,10 @@
-import { useMemo, useCallback, useState, useEffect } from "react";
-import { geoPath, geoMercator } from "d3-geo";
-import type { Feature } from "geojson";
+import { useEffect } from "react";
 import type { CountryWithGeometry } from "../../types/country";
 import { countryVisitKey } from "../../lib/visitCountryKey";
-import {
-  getVisitedLandmarksSet,
-  saveVisitedLandmarksSet,
-} from "../../lib/visitStorage";
-import { getStoredUserId, syncVisitsToServer } from "../../lib/userApi";
+import { useLandmarksForCountry } from "../../hooks/useLandmarksForCountry";
+import { useLandmarkVisits } from "../../hooks/useLandmarkVisits";
+import { CountrySilhouette } from "./CountrySilhouette";
 import styles from "./CountryModal.module.css";
-
-type Landmark = {
-  id: string;
-  name: string;
-};
-
-function makeKey(countryCode: string, landmarkId: string) {
-  return `${countryCode}:${landmarkId}`;
-}
 
 type Props = {
   country: CountryWithGeometry;
@@ -26,10 +13,6 @@ type Props = {
   isCountryVisited: boolean;
   onToggleCountryVisited: () => void;
 };
-
-function canQueryLandmarksApi(isoA2: string) {
-  return /^[A-Za-z]{2}$/.test(isoA2);
-}
 
 export default function CountryModal({
   country,
@@ -41,83 +24,9 @@ export default function CountryModal({
   const code = country.properties.ISO_A2;
   const visitKey = countryVisitKey(country.properties);
   const name = country.properties.ADMIN;
-  const [landmarks, setLandmarks] = useState<Landmark[]>([]);
-  const [landmarksReady, setLandmarksReady] = useState(false);
 
-  const [visited, setVisited] = useState<Set<string>>(() => getVisitedLandmarksSet());
-
-  useEffect(() => {
-    setVisited(getVisitedLandmarksSet());
-  }, [visitEpoch, visitKey]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function load() {
-      try {
-        const res = canQueryLandmarksApi(code)
-          ? await fetch(`/api/landmarks/country/${encodeURIComponent(code)}`)
-          : await fetch(`/api/landmarks/country/name/${encodeURIComponent(name)}`);
-        if (!res.ok) throw new Error("not found");
-        const data: { landmarks: Landmark[] } = await res.json();
-        if (!cancelled) setLandmarks(data.landmarks ?? []);
-      } catch {
-        if (!cancelled) setLandmarks([]);
-      } finally {
-        if (!cancelled) setLandmarksReady(true);
-      }
-    }
-
-    setLandmarksReady(false);
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [code, name]);
-
-  const toggleVisited = useCallback(
-    (landmark: Landmark) => {
-      const key = makeKey(visitKey, landmark.id);
-      setVisited((prev) => {
-        const next = new Set(prev);
-        if (next.has(key)) {
-          next.delete(key);
-        } else {
-          next.add(key);
-        }
-        saveVisitedLandmarksSet(next);
-        const uid = getStoredUserId();
-        if (uid) {
-          void syncVisitsToServer(uid).catch(() => {});
-        }
-        return next;
-      });
-    },
-    [visitKey]
-  );
-
-  const svgPath = useMemo(() => {
-    const feature: Feature = {
-      type: "Feature",
-      properties: {},
-      geometry: country.geometry as Feature["geometry"],
-    };
-    const padding = 20;
-    const projection = geoMercator().fitExtent(
-      [
-        [padding, padding],
-        [280 - padding, 200 - padding],
-      ],
-      feature
-    );
-    const path = geoPath(projection);
-    return path(feature) ?? "";
-  }, [country.geometry]);
-
-  const isVisited = useCallback(
-    (landmark: Landmark) => visited.has(makeKey(visitKey, landmark.id)),
-    [visitKey, visited]
-  );
+  const { landmarks, landmarksReady } = useLandmarksForCountry(code, name);
+  const { toggleVisited, isVisited } = useLandmarkVisits(visitKey, visitEpoch);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -143,12 +52,8 @@ export default function CountryModal({
             </h2>
             <div className="flex items-center justify-between gap-4 py-1">
               <div className="flex flex-col">
-                <span className="text-sm font-medium text-white">
-                  Visited
-                </span>
-                <span className="text-xs text-slate-400">
-                  Mark this country as visited
-                </span>
+                <span className="text-sm font-medium text-white">Visited</span>
+                <span className="text-xs text-slate-400">Mark this country as visited</span>
               </div>
               <button
                 type="button"
@@ -175,19 +80,7 @@ export default function CountryModal({
         </div>
 
         <div className={styles.layout}>
-          <div className={styles.svgContainer}>
-            <svg
-              className={styles.svg}
-              width={280}
-              height={200}
-              viewBox="0 0 280 200"
-            >
-              <path
-                className={`${styles.countryPath} ${isCountryVisited ? styles.countryPathFilled : ""}`}
-                d={svgPath}
-              />
-            </svg>
-          </div>
+          <CountrySilhouette geometry={country.geometry} isCountryVisited={isCountryVisited} />
 
           <div className={styles.content}>
             {!landmarksReady ? (
