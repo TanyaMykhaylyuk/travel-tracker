@@ -7,7 +7,11 @@ import {
 import { getStoredUserId, syncVisitsToServer } from "../lib/userApi";
 import type { LandmarkDto } from "../lib/api/landmarks";
 
-export function useLandmarkVisits(visitKey: string, visitEpoch: number) {
+export function useLandmarkVisits(
+  visitKey: string,
+  visitEpoch: number,
+  onLandmarksChanged?: () => void
+) {
   const [visited, setVisited] = useState<Set<string>>(() => getVisitedLandmarksSet());
 
   useEffect(() => {
@@ -31,10 +35,11 @@ export function useLandmarkVisits(visitKey: string, visitEpoch: number) {
         if (uid) {
           void syncVisitsToServer(uid).catch(() => {});
         }
+        queueMicrotask(() => onLandmarksChanged?.());
         return next;
       });
     },
-    [visitKey]
+    [visitKey, onLandmarksChanged]
   );
 
   const isVisited = useCallback(

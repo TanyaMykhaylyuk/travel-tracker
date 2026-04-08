@@ -26,3 +26,23 @@ export function getVisitedLandmarksSet(): Set<string> {
 export function saveVisitedLandmarksSet(visited: Set<string>): void {
   localStorage.setItem(VISITED_LANDMARKS_KEY, JSON.stringify([...visited]));
 }
+
+export function hasAnyVisitedLandmarkForCountry(
+  countryVisitKey: string,
+  visitedLandmarks: Set<string>
+): boolean {
+  const prefix = `${countryVisitKey}:`;
+  for (const k of visitedLandmarks) {
+    if (k.startsWith(prefix)) return true;
+  }
+  return false;
+}
+
+export function clearLandmarksForCountry(countryVisitKey: string): void {
+  const prefix = `${countryVisitKey}:`;
+  const next = new Set(getVisitedLandmarksSet());
+  for (const k of next) {
+    if (k.startsWith(prefix)) next.delete(k);
+  }
+  saveVisitedLandmarksSet(next);
+}

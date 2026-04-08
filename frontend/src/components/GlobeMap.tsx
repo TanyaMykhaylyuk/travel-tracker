@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import Globe from "react-globe.gl";
+import { Button } from "@/components/ui/button";
 import CountryModal from "./CountryModal";
 import UserProfilePanel from "./UserProfilePanel";
 import type { CountryFeature, CountryWithGeometry } from "../types/country";
@@ -8,6 +9,7 @@ import { buildGlobePolygonsData } from "../lib/geo/crimeaReassign";
 import { useCountriesData } from "../hooks/useCountriesData";
 import { useChoroplethScale } from "../hooks/useChoroplethScale";
 import { useGlobeVisitState } from "../hooks/useGlobeVisitState";
+import { hasAnyVisitedLandmarkForCountry } from "../lib/visitStorage";
 
 export default function GlobeMap() {
   const countries = useCountriesData();
@@ -16,9 +18,13 @@ export default function GlobeMap() {
   const [selectedCountry, setSelectedCountry] = useState<CountryWithGeometry | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
 
-  const { visitedCountries, visitEpoch, toggleCountryVisited } = useGlobeVisitState(
-    countries.features
-  );
+  const {
+    visitedCountries,
+    visitedLandmarks,
+    visitEpoch,
+    handleCountryVisitToggle,
+    refreshLandmarksFromStorage,
+  } = useGlobeVisitState(countries.features);
 
   const { getVal, colorScale } = useChoroplethScale(countries.features);
 
@@ -31,7 +37,8 @@ export default function GlobeMap() {
     (d: object) => {
       const feat = d as CountryFeature;
       const code = countryVisitKey(feat.properties);
-      const isVisited = visitedCountries.has(code);
+      const isVisited =
+        visitedCountries.has(code) || hasAnyVisitedLandmarkForCountry(code, visitedLandmarks);
       if (isUserPlanet) {
         if (isVisited) return "#4a9eff";
         return d === hoverD ? "#94c5ff" : "#ffffff";
@@ -39,11 +46,12 @@ export default function GlobeMap() {
       if (d === hoverD) return "steelblue";
       return colorScale(getVal(feat));
     },
-    [visitedCountries, isUserPlanet, hoverD, colorScale, getVal]
+    [visitedCountries, visitedLandmarks, isUserPlanet, hoverD, colorScale, getVal]
   );
 
   return (
     <div
+      className="dark"
       style={{
         position: "relative",
         width: "100vw",
@@ -111,8 +119,10 @@ export default function GlobeMap() {
           <UserProfilePanel open={profileOpen} onClose={() => setProfileOpen(false)} />
         </>
       )}
-      <button
+      <Button
         type="button"
+        variant="outline"
+        className="absolute bottom-6 right-6 z-20 shadow-lg text-foreground"
         onClick={() => {
           setIsUserPlanet((prev) => {
             const next = !prev;
@@ -120,31 +130,26 @@ export default function GlobeMap() {
             return next;
           });
         }}
-        style={{
-          position: "absolute",
-          bottom: 24,
-          right: 24,
-          width: 56,
-          height: 56,
-          borderRadius: "50%",
-          backgroundColor: "#0ea5e9",
-          boxShadow: "0 4px 14px rgba(0,0,0,0.4)",
-          border: "none",
-          cursor: "pointer",
-        }}
         aria-label={isUserPlanet ? "Show default globe" : "Show my globe"}
-      />
+      >
+        {isUserPlanet ? "Globe" : "My Travel Globe"}
+      </Button>
       {selectedCountry && (
         <CountryModal
           country={selectedCountry}
           visitEpoch={visitEpoch}
           onClose={() => setSelectedCountry(null)}
-          isCountryVisited={visitedCountries.has(
-            countryVisitKey(selectedCountry.properties)
-          )}
-          onToggleCountryVisited={() =>
-            toggleCountryVisited(countryVisitKey(selectedCountry.properties))
+          isCountryVisited={
+            visitedCountries.has(countryVisitKey(selectedCountry.properties)) ||
+            hasAnyVisitedLandmarkForCountry(
+              countryVisitKey(selectedCountry.properties),
+              visitedLandmarks
+            )
           }
+          onToggleCountryVisited={() =>
+            handleCountryVisitToggle(countryVisitKey(selectedCountry.properties))
+          }
+          onLandmarksChanged={refreshLandmarksFromStorage}
         />
       )}
     </div>

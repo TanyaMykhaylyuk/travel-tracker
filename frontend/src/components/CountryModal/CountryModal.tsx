@@ -12,6 +12,7 @@ type Props = {
   onClose: () => void;
   isCountryVisited: boolean;
   onToggleCountryVisited: () => void;
+  onLandmarksChanged?: () => void;
 };
 
 export default function CountryModal({
@@ -20,13 +21,18 @@ export default function CountryModal({
   onClose,
   isCountryVisited,
   onToggleCountryVisited,
+  onLandmarksChanged,
 }: Props) {
   const code = country.properties.ISO_A2;
   const visitKey = countryVisitKey(country.properties);
   const name = country.properties.ADMIN;
 
   const { landmarks, landmarksReady } = useLandmarksForCountry(code, name);
-  const { toggleVisited, isVisited } = useLandmarkVisits(visitKey, visitEpoch);
+  const { toggleVisited, isVisited } = useLandmarkVisits(
+    visitKey,
+    visitEpoch,
+    onLandmarksChanged
+  );
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
