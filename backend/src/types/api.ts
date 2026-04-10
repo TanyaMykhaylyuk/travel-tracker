@@ -6,6 +6,7 @@ export type UserPublicDto = {
   photoDataUrl: string
   visitedCountries: string[]
   visitedLandmarks: string[]
+  hasPassword?: boolean
 }
 
 export type UserVisitsDto = {
@@ -41,4 +42,23 @@ export type CreateOrUpdateUserBody = {
 export type PatchVisitsBody = {
   visitedCountries?: string[]
   visitedLandmarks?: string[]
+}
+
+export type AuthLoginBody = {
+  handle: string
+  password: string
+}
+
+export type AuthRegisterBody = {
+  handle: string
+  displayName: string
+  password: string
+  bio: string
+  photoDataUrl: string
+  visitedCountries: string[]
+  visitedLandmarks: string[]
+}
+
+export type AuthClaimBody = AuthRegisterBody & {
+  userId: string
 }

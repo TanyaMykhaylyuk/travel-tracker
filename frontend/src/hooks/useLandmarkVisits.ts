@@ -10,7 +10,8 @@ import type { LandmarkDto } from "../lib/api/landmarks";
 export function useLandmarkVisits(
   visitKey: string,
   visitEpoch: number,
-  onLandmarksChanged?: () => void
+  onLandmarksChanged?: () => void,
+  visitsSyncReady = true
 ) {
   const [visited, setVisited] = useState<Set<string>>(() => getVisitedLandmarksSet());
 
@@ -22,6 +23,7 @@ export function useLandmarkVisits(
 
   const toggleVisited = useCallback(
     (landmark: LandmarkDto) => {
+      if (!visitsSyncReady) return;
       const key = landmarkVisitKey(visitKey, landmark.id);
       setVisited((prev) => {
         const next = new Set(prev);
@@ -39,7 +41,7 @@ export function useLandmarkVisits(
         return next;
       });
     },
-    [visitKey, onLandmarksChanged]
+    [visitKey, onLandmarksChanged, visitsSyncReady]
   );
 
   const isVisited = useCallback(

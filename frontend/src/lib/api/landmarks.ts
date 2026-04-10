@@ -14,7 +14,12 @@ export async function fetchLandmarksForCountry(
   const res = canQueryLandmarksByIso(isoA2)
     ? await fetch(`/api/landmarks/country/${encodeURIComponent(isoA2)}`)
     : await fetch(`/api/landmarks/country/name/${encodeURIComponent(countryName)}`);
-  if (!res.ok) throw new Error("not found");
+  if (res.status === 404) {
+    return [];
+  }
+  if (!res.ok) {
+    throw new Error(`landmarks_http_${res.status}`);
+  }
   const data = (await res.json()) as { landmarks?: LandmarkDto[] };
   return data.landmarks ?? [];
 }

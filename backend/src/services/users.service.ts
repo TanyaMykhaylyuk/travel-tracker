@@ -1,3 +1,4 @@
+import mongoose from 'mongoose'
 import { UserModel } from '../models/User'
 import { HttpError } from '../utils/httpError'
 import { HANDLE_RE, isValidObjectId } from '../utils/validation'
@@ -8,7 +9,7 @@ import type {
   UserVisitsDto,
 } from '../types/api'
 
-function toPublicDto(doc: {
+export function toPublicDto(doc: {
   _id: unknown
   handle: string
   displayName: string
@@ -16,6 +17,7 @@ function toPublicDto(doc: {
   photoDataUrl: string
   visitedCountries: string[]
   visitedLandmarks: string[]
+  passwordHash?: string
 }): UserPublicDto {
   return {
     id: String(doc._id),
@@ -25,6 +27,7 @@ function toPublicDto(doc: {
     photoDataUrl: doc.photoDataUrl,
     visitedCountries: doc.visitedCountries,
     visitedLandmarks: doc.visitedLandmarks,
+    hasPassword: Boolean(doc.passwordHash),
   }
 }
 
@@ -38,6 +41,27 @@ function validateUserInput(body: CreateOrUpdateUserBody): void {
   }
   if (!body.displayName) {
     throw new HttpError(400, 'Name is required.')
+  }
+}
+
+export async function bootstrapAnonymousUser(visits: {
+  visitedCountries: string[]
+  visitedLandmarks: string[]
+}): Promise<UserPublicDto> {
+  const handle = `u${new mongoose.Types.ObjectId().toString()}`
+  try {
+    const doc = await UserModel.create({
+      handle,
+      displayName: 'Traveler',
+      bio: '',
+      photoDataUrl: '',
+      visitedCountries: visits.visitedCountries,
+      visitedLandmarks: visits.visitedLandmarks,
+    })
+    return toPublicDto(doc.toObject())
+  } catch (e: unknown) {
+    if (e instanceof HttpError) throw e
+    throw new HttpError(500, 'Failed to create user')
   }
 }
 
@@ -81,7 +105,9 @@ export async function createOrUpdateUser(
           },
         },
         { new: true, runValidators: true }
-      ).lean()
+      )
+        .select('+passwordHash')
+        .lean()
 
       if (!doc) {
         throw new HttpError(500, 'Failed to save user')
@@ -103,7 +129,9 @@ export async function createOrUpdateUser(
         },
       },
       { new: true, upsert: true, runValidators: true }
-    ).lean()
+    )
+      .select('+passwordHash')
+      .lean()
 
     return toPublicDto(doc)
   } catch (e: unknown) {
@@ -121,7 +149,7 @@ export async function getUserById(id: string): Promise<UserPublicDto> {
     throw new HttpError(400, 'Invalid user id')
   }
   try {
-    const doc = await UserModel.findById(id).lean()
+    const doc = await UserModel.findById(id).select('+passwordHash').lean()
     if (!doc) {
       throw new HttpError(404, 'Not found')
     }

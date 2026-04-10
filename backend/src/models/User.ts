@@ -15,6 +15,7 @@ const userSchema = new mongoose.Schema(
     photoDataUrl: { type: String, default: "" },
     visitedCountries: { type: [String], default: [] },
     visitedLandmarks: { type: [String], default: [] },
+    passwordHash: { type: String, default: "", select: false },
   },
   { timestamps: true }
 );

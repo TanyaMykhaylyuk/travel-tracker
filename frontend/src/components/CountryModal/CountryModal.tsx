@@ -9,6 +9,7 @@ import styles from "./CountryModal.module.css";
 type Props = {
   country: CountryWithGeometry;
   visitEpoch: number;
+  visitsSyncReady?: boolean;
   onClose: () => void;
   isCountryVisited: boolean;
   onToggleCountryVisited: () => void;
@@ -18,6 +19,7 @@ type Props = {
 export default function CountryModal({
   country,
   visitEpoch,
+  visitsSyncReady = true,
   onClose,
   isCountryVisited,
   onToggleCountryVisited,
@@ -27,11 +29,12 @@ export default function CountryModal({
   const visitKey = countryVisitKey(country.properties);
   const name = country.properties.ADMIN;
 
-  const { landmarks, landmarksReady } = useLandmarksForCountry(code, name);
+  const { landmarks, landmarksReady, landmarksError } = useLandmarksForCountry(code, name);
   const { toggleVisited, isVisited } = useLandmarkVisits(
     visitKey,
     visitEpoch,
-    onLandmarksChanged
+    onLandmarksChanged,
+    visitsSyncReady
   );
 
   useEffect(() => {
@@ -66,8 +69,9 @@ export default function CountryModal({
                 role="switch"
                 aria-checked={isCountryVisited}
                 aria-label="Color country on map"
+                disabled={!visitsSyncReady}
                 onClick={onToggleCountryVisited}
-                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-neutral-500 focus:ring-offset-2 focus:ring-offset-[#1a1a1a] ${isCountryVisited ? "bg-neutral-400" : "bg-zinc-600"}`}
+                className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-neutral-500 focus:ring-offset-2 focus:ring-offset-[#1a1a1a] ${visitsSyncReady ? "cursor-pointer" : "cursor-wait opacity-60"} ${isCountryVisited ? "bg-neutral-400" : "bg-zinc-600"}`}
               >
                 <span
                   className={`pointer-events-none absolute left-0.5 top-0.5 inline-block h-5 w-5 rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isCountryVisited ? "translate-x-5" : "translate-x-0"}`}
@@ -91,6 +95,8 @@ export default function CountryModal({
           <div className={styles.content}>
             {!landmarksReady ? (
               <p className="text-slate-400 text-sm py-4 m-0">Loading landmarks…</p>
+            ) : landmarksError ? (
+              <p className="text-amber-200/90 text-sm py-4 m-0 leading-relaxed">{landmarksError}</p>
             ) : landmarks.length === 0 ? (
               <p className="text-slate-400 text-sm py-4 m-0">
                 No landmarks listed for this country yet.
@@ -103,13 +109,14 @@ export default function CountryModal({
                     <li key={landmark.id}>
                       <label
                         htmlFor={`${visitKey}-${landmark.id}`}
-                        className="flex cursor-pointer items-center gap-3 py-4"
+                        className={`flex items-center gap-3 py-4 ${visitsSyncReady ? "cursor-pointer" : "cursor-wait opacity-60"}`}
                       >
                         <div className="relative flex h-5 w-5 shrink-0 items-center justify-center">
                           <input
                             type="checkbox"
                             id={`${visitKey}-${landmark.id}`}
                             checked={checked}
+                            disabled={!visitsSyncReady}
                             onChange={() => toggleVisited(landmark)}
                             className="sr-only"
                           />

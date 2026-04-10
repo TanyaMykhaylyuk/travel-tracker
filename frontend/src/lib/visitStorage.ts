@@ -38,6 +38,15 @@ export function hasAnyVisitedLandmarkForCountry(
   return false;
 }
 
+export function clearAllVisitData(): void {
+  try {
+    localStorage.removeItem(VISITED_COUNTRIES_KEY);
+    localStorage.removeItem(VISITED_LANDMARKS_KEY);
+  } catch {
+    void 0;
+  }
+}
+
 export function clearLandmarksForCountry(countryVisitKey: string): void {
   const prefix = `${countryVisitKey}:`;
   const next = new Set(getVisitedLandmarksSet());

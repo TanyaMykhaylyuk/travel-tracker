@@ -22,6 +22,7 @@ export default function GlobeMap() {
     visitedCountries,
     visitedLandmarks,
     visitEpoch,
+    visitsSyncReady,
     handleCountryVisitToggle,
     refreshLandmarksFromStorage,
   } = useGlobeVisitState(countries.features);
@@ -138,6 +139,7 @@ export default function GlobeMap() {
         <CountryModal
           country={selectedCountry}
           visitEpoch={visitEpoch}
+          visitsSyncReady={visitsSyncReady}
           onClose={() => setSelectedCountry(null)}
           isCountryVisited={
             visitedCountries.has(countryVisitKey(selectedCountry.properties)) ||

@@ -8,7 +8,11 @@ import {
   hasAnyVisitedLandmarkForCountry,
   saveVisitedCountriesSet,
 } from "../lib/visitStorage";
-import { getStoredUserId, syncVisitsToServer } from "../lib/userApi";
+import {
+  getStoredUserId,
+  syncVisitsToServer,
+  VISITS_REFRESH_EVENT,
+} from "../lib/userApi";
 import { useBootstrapUserVisits } from "./useBootstrapUserVisits";
 
 export function useGlobeVisitState(features: CountryFeature[]) {
@@ -27,39 +31,53 @@ export function useGlobeVisitState(features: CountryFeature[]) {
     setVisitEpoch((e) => e + 1);
   }, []);
 
-  useBootstrapUserVisits(handleSynced);
+  const visitsSyncReady = useBootstrapUserVisits(handleSynced);
 
-  const handleCountryVisitToggle = useCallback((code: string) => {
-    const countries = getVisitedCountriesSet();
-    const landmarks = getVisitedLandmarksSet();
-    const effective =
-      countries.has(code) || hasAnyVisitedLandmarkForCountry(code, landmarks);
+  useEffect(() => {
+    function onVisitsRefresh() {
+      setVisitedCountries(new Set(getVisitedCountriesSet()));
+      setVisitedLandmarks(new Set(getVisitedLandmarksSet()));
+      setVisitEpoch((e) => e + 1);
+    }
+    window.addEventListener(VISITS_REFRESH_EVENT, onVisitsRefresh);
+    return () => window.removeEventListener(VISITS_REFRESH_EVENT, onVisitsRefresh);
+  }, []);
 
-    if (effective) {
+  const handleCountryVisitToggle = useCallback(
+    (code: string) => {
+      if (!visitsSyncReady) return;
+      const countries = getVisitedCountriesSet();
+      const landmarks = getVisitedLandmarksSet();
+      const effective =
+        countries.has(code) || hasAnyVisitedLandmarkForCountry(code, landmarks);
+
+      if (effective) {
+        const nextCountries = new Set(countries);
+        nextCountries.delete(code);
+        saveVisitedCountriesSet(nextCountries);
+        clearLandmarksForCountry(code);
+        setVisitedCountries(nextCountries);
+        setVisitedLandmarks(getVisitedLandmarksSet());
+        setVisitEpoch((e) => e + 1);
+        const uid = getStoredUserId();
+        if (uid) {
+          void syncVisitsToServer(uid).catch(() => {});
+        }
+        return;
+      }
+
       const nextCountries = new Set(countries);
-      nextCountries.delete(code);
+      nextCountries.add(code);
       saveVisitedCountriesSet(nextCountries);
-      clearLandmarksForCountry(code);
       setVisitedCountries(nextCountries);
-      setVisitedLandmarks(getVisitedLandmarksSet());
       setVisitEpoch((e) => e + 1);
       const uid = getStoredUserId();
       if (uid) {
         void syncVisitsToServer(uid).catch(() => {});
       }
-      return;
-    }
-
-    const nextCountries = new Set(countries);
-    nextCountries.add(code);
-    saveVisitedCountriesSet(nextCountries);
-    setVisitedCountries(nextCountries);
-    setVisitEpoch((e) => e + 1);
-    const uid = getStoredUserId();
-    if (uid) {
-      void syncVisitsToServer(uid).catch(() => {});
-    }
-  }, []);
+    },
+    [visitsSyncReady]
+  );
 
   useEffect(() => {
     if (!features.length) return;
@@ -70,6 +88,10 @@ export function useGlobeVisitState(features: CountryFeature[]) {
           return prev;
         }
         saveVisitedCountriesSet(migrated);
+        const uid = getStoredUserId();
+        if (uid) {
+          void syncVisitsToServer(uid).catch(() => {});
+        }
         return migrated;
       });
     });
@@ -79,6 +101,7 @@ export function useGlobeVisitState(features: CountryFeature[]) {
     visitedCountries,
     visitedLandmarks,
     visitEpoch,
+    visitsSyncReady,
     handleCountryVisitToggle,
     refreshLandmarksFromStorage,
   };

@@ -6,8 +6,10 @@ import {
 import {
   fetchUser,
   getStoredUserId,
+  logoutTraveler,
   registerOrUpdateUser,
   setStoredUserId,
+  type ServerUser,
 } from "../lib/userApi";
 import type { ProfileData } from "../types/profile";
 
@@ -26,6 +28,7 @@ export function useUserProfile(open: boolean, onClose: () => void) {
   const [draft, setDraft] = useState<ProfileData>(profile);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [accountSecured, setAccountSecured] = useState(false);
 
   const persistToServer = useCallback(
     async (nextProfile: ProfileData, nextPhotoUrl: string | null) => {
@@ -45,6 +48,7 @@ export function useUserProfile(open: boolean, onClose: () => void) {
       });
       setPhotoUrl(user.photoDataUrl || null);
       setStoredUserId(user.id);
+      setAccountSecured(Boolean(user.hasPassword));
     },
     []
   );
@@ -52,7 +56,10 @@ export function useUserProfile(open: boolean, onClose: () => void) {
   useEffect(() => {
     if (!open) return;
     const userId = getStoredUserId();
-    if (!userId) return;
+    if (!userId) {
+      setAccountSecured(false);
+      return;
+    }
     fetchUser(userId)
       .then((user) => {
         setProfile({
@@ -61,11 +68,30 @@ export function useUserProfile(open: boolean, onClose: () => void) {
           bio: user.bio,
         });
         setPhotoUrl(user.photoDataUrl || null);
+        setAccountSecured(Boolean(user.hasPassword));
       })
       .catch(() => {
         setStoredUserId(null);
+        setAccountSecured(false);
       });
   }, [open]);
+
+  const handleAuthed = useCallback((user: ServerUser) => {
+    setProfile({
+      displayName: user.displayName,
+      handle: user.handle,
+      bio: user.bio,
+    });
+    setPhotoUrl(user.photoDataUrl || null);
+    setAccountSecured(Boolean(user.hasPassword));
+  }, []);
+
+  const handleLogout = useCallback(() => {
+    logoutTraveler();
+    setProfile(emptyProfile);
+    setPhotoUrl(null);
+    setAccountSecured(false);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -178,5 +204,8 @@ export function useUserProfile(open: boolean, onClose: () => void) {
     displayName,
     handleLine,
     bioText,
+    accountSecured,
+    handleAuthed,
+    handleLogout,
   };
 }

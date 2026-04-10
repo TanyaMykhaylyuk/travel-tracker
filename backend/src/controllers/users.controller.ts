@@ -1,15 +1,28 @@
 import type { Request, Response } from 'express'
 import {
+  bootstrapAnonymousUser,
   createOrUpdateUser,
   getUserById,
   patchUserVisits,
 } from '../services/users.service'
 import { sendError } from '../utils/respond'
 import {
+  parseBootstrapUserBody,
   parseCreateOrUpdateUserBody,
   parsePatchVisitsBody,
   paramUserId,
 } from '../utils/validation'
+
+export async function bootstrapUser(req: Request, res: Response): Promise<void> {
+  const body = req.body as Record<string, unknown>
+  try {
+    const visits = parseBootstrapUserBody(body)
+    const user = await bootstrapAnonymousUser(visits)
+    res.json(user)
+  } catch (e: unknown) {
+    sendError(res, e, { status: 500, message: 'Failed to create user' })
+  }
+}
 
 export async function upsertUser(req: Request, res: Response): Promise<void> {
   const body = req.body as Record<string, unknown>

@@ -1,6 +1,12 @@
 import mongoose from 'mongoose'
 import type { Request } from 'express'
-import type { CreateOrUpdateUserBody, PatchVisitsBody } from '../types/api'
+import type {
+  AuthClaimBody,
+  AuthLoginBody,
+  AuthRegisterBody,
+  CreateOrUpdateUserBody,
+  PatchVisitsBody,
+} from '../types/api'
 
 export const HANDLE_RE = /^[a-z0-9_]{2,32}$/
 
@@ -62,6 +68,61 @@ export function parseCreateOrUpdateUserBody(
     visitedCountries,
     visitedLandmarks,
   }
+}
+
+export function parseBootstrapUserBody(body: Record<string, unknown>): {
+  visitedCountries: string[]
+  visitedLandmarks: string[]
+} {
+  const visitedCountries = Array.isArray(body.visitedCountries)
+    ? body.visitedCountries.filter((x): x is string => typeof x === 'string')
+    : []
+  const visitedLandmarks = Array.isArray(body.visitedLandmarks)
+    ? body.visitedLandmarks.filter((x): x is string => typeof x === 'string')
+    : []
+  return { visitedCountries, visitedLandmarks }
+}
+
+function authProfilePayload(body: Record<string, unknown>): AuthRegisterBody {
+  const handle =
+    typeof body.handle === 'string' ? body.handle.trim().replace(/^@+/, '') : ''
+  const displayName =
+    typeof body.displayName === 'string' ? body.displayName.trim() : ''
+  const password = typeof body.password === 'string' ? body.password : ''
+  const bio = typeof body.bio === 'string' ? body.bio.trim() : ''
+  const photoDataUrl =
+    typeof body.photoDataUrl === 'string' ? body.photoDataUrl : ''
+  const visitedCountries = Array.isArray(body.visitedCountries)
+    ? body.visitedCountries.filter((x): x is string => typeof x === 'string')
+    : []
+  const visitedLandmarks = Array.isArray(body.visitedLandmarks)
+    ? body.visitedLandmarks.filter((x): x is string => typeof x === 'string')
+    : []
+  return {
+    handle,
+    displayName,
+    password,
+    bio,
+    photoDataUrl,
+    visitedCountries,
+    visitedLandmarks,
+  }
+}
+
+export function parseAuthLoginBody(body: Record<string, unknown>): AuthLoginBody {
+  const handle =
+    typeof body.handle === 'string' ? body.handle.trim().replace(/^@+/, '') : ''
+  const password = typeof body.password === 'string' ? body.password : ''
+  return { handle, password }
+}
+
+export function parseAuthRegisterBody(body: Record<string, unknown>): AuthRegisterBody {
+  return authProfilePayload(body)
+}
+
+export function parseAuthClaimBody(body: Record<string, unknown>): AuthClaimBody {
+  const userId = typeof body.userId === 'string' ? body.userId.trim() : ''
+  return { userId, ...authProfilePayload(body) }
 }
 
 export function parsePatchVisitsBody(

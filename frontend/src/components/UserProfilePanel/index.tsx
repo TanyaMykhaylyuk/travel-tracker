@@ -1,4 +1,5 @@
 import { useUserProfile } from "../../hooks/useUserProfile";
+import { ProfileAccountSection } from "./ProfileAccountSection";
 import { ProfileEditForm } from "./ProfileEditForm";
 import { ProfilePhotoSection } from "./ProfilePhotoSection";
 import { ProfileReadView } from "./ProfileReadView";
@@ -27,6 +28,9 @@ export default function UserProfilePanel({ open, onClose }: Props) {
     displayName,
     handleLine,
     bioText,
+    accountSecured,
+    handleAuthed,
+    handleLogout,
   } = useUserProfile(open, onClose);
 
   if (!open) return null;
@@ -94,6 +98,15 @@ export default function UserProfilePanel({ open, onClose }: Props) {
         )}
 
         <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="pt-5">
+            <ProfileAccountSection
+              accountSecured={accountSecured}
+              profile={profile}
+              photoUrl={photoUrl}
+              onAuthed={handleAuthed}
+              onLogout={handleLogout}
+            />
+          </div>
           <ProfilePhotoSection
             fileInputRef={fileInputRef}
             photoUrl={photoUrl}
