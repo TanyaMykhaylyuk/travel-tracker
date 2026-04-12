@@ -7,7 +7,6 @@ import type { CountryFeature, CountryWithGeometry } from "../types/country";
 import { countryVisitKey } from "../lib/visitCountryKey";
 import { buildGlobePolygonsData } from "../lib/geo/crimeaReassign";
 import { useCountriesData } from "../hooks/useCountriesData";
-import { useChoroplethScale } from "../hooks/useChoroplethScale";
 import { useGlobeVisitState } from "../hooks/useGlobeVisitState";
 import { hasAnyVisitedLandmarkForCountry } from "../lib/visitStorage";
 
@@ -27,8 +26,6 @@ export default function GlobeMap() {
     refreshLandmarksFromStorage,
   } = useGlobeVisitState(countries.features);
 
-  const { getVal, colorScale } = useChoroplethScale(countries.features);
-
   const polygonsData = useMemo(
     () => buildGlobePolygonsData(countries.features),
     [countries.features]
@@ -44,10 +41,24 @@ export default function GlobeMap() {
         if (isVisited) return "#4a9eff";
         return d === hoverD ? "#94c5ff" : "#ffffff";
       }
-      if (d === hoverD) return "steelblue";
-      return colorScale(getVal(feat));
+      if (d === hoverD) return "rgba(200, 220, 255, 0.22)";
+      return "rgba(0, 0, 0, 0)";
     },
-    [visitedCountries, visitedLandmarks, isUserPlanet, hoverD, colorScale, getVal]
+    [visitedCountries, visitedLandmarks, isUserPlanet, hoverD]
+  );
+
+  const polygonSideColor = useCallback(
+    () => (isUserPlanet ? "rgba(255, 255, 255, 0.3)" : "rgba(0, 0, 0, 0)"),
+    [isUserPlanet]
+  );
+
+  const polygonStrokeColor = useCallback(
+    (d: object) => {
+      if (isUserPlanet) return "rgba(200, 220, 255, 0.5)";
+      if (d === hoverD) return "rgba(255, 255, 255, 0.5)";
+      return "rgba(0, 0, 0, 0)";
+    },
+    [isUserPlanet, hoverD]
   );
 
   return (
@@ -64,21 +75,22 @@ export default function GlobeMap() {
         globeImageUrl="https://cdn.jsdelivr.net/npm/three-globe/example/img/earth-blue-marble.jpg"
         bumpImageUrl="https://cdn.jsdelivr.net/npm/three-globe/example/img/earth-topology.png"
         backgroundColor="#000"
+        animateIn={false}
+        waitForGlobeReady
+        globeCurvatureResolution={3}
         showGlobe
         showAtmosphere
-        atmosphereColor="lightskyblue"
-        atmosphereAltitude={0.15}
-        showGraticules
+        atmosphereColor="rgba(135, 206, 250, 0.85)"
+        atmosphereAltitude={0.12}
+        showGraticules={false}
         lineHoverPrecision={0}
         polygonsData={polygonsData}
-        polygonAltitude={(d: object) => (d === hoverD ? 0.06 : 0.01)}
+        polygonAltitude={(d: object) =>
+          isUserPlanet ? (d === hoverD ? 0.06 : 0.01) : d === hoverD ? 0.02 : 0.004
+        }
         polygonCapColor={polygonCapColor}
-        polygonSideColor={() =>
-          isUserPlanet ? "rgba(255, 255, 255, 0.3)" : "rgba(30, 30, 30, 0.15)"
-        }
-        polygonStrokeColor={() =>
-          isUserPlanet ? "rgba(200, 220, 255, 0.5)" : "rgba(0, 0, 0, 0.4)"
-        }
+        polygonSideColor={polygonSideColor}
+        polygonStrokeColor={polygonStrokeColor}
         polygonLabel={(d: object) => {
           const feat = d as CountryFeature;
           const props = feat.properties;
