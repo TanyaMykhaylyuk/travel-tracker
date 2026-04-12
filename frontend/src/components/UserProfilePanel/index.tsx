@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useUserProfile } from "../../hooks/useUserProfile";
 import { ProfileAccountSection } from "./ProfileAccountSection";
 import { ProfileEditForm } from "./ProfileEditForm";
@@ -9,7 +10,18 @@ type Props = {
   onClose: () => void;
 };
 
+type PanelSection = "profile" | "account";
+
+const tabBase =
+  "shrink-0 rounded-md px-3 py-1.5 text-sm font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-500";
+
 export default function UserProfilePanel({ open, onClose }: Props) {
+  const [section, setSection] = useState<PanelSection>("profile");
+
+  useEffect(() => {
+    if (open) setSection("profile");
+  }, [open]);
+
   const {
     fileInputRef,
     photoUrl,
@@ -48,37 +60,71 @@ export default function UserProfilePanel({ open, onClose }: Props) {
         aria-modal="true"
         aria-labelledby="profile-panel-title"
       >
-        <header className="flex shrink-0 items-center gap-2 px-5 py-4">
-          <h2 id="profile-panel-title" className="min-w-0 flex-1 text-base font-semibold text-zinc-100">
-            Profile
-          </h2>
-          {!isEditing ? (
+        <header className="flex shrink-0 flex-wrap items-center gap-2 px-5 py-4">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1" role="tablist" aria-label="Profile panel sections">
+            <h2 id="profile-panel-title" className="sr-only">
+              Profile
+            </h2>
             <button
               type="button"
-              onClick={startEditing}
-              className="shrink-0 rounded-md px-3 py-1.5 text-sm font-medium text-zinc-300 transition hover:bg-zinc-900 hover:text-zinc-100"
+              id="user-profile-tab-profile"
+              role="tab"
+              aria-selected={section === "profile"}
+              onClick={() => setSection("profile")}
+              className={`${tabBase} ${
+                section === "profile"
+                  ? "bg-zinc-800 text-zinc-100"
+                  : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200"
+              }`}
             >
-              Edit profile
+              Profile
             </button>
-          ) : (
-            <>
+            <button
+              type="button"
+              id="user-profile-tab-account"
+              role="tab"
+              aria-selected={section === "account"}
+              onClick={() => {
+                if (isEditing) cancelEditing();
+                setSection("account");
+              }}
+              className={`${tabBase} ${
+                section === "account"
+                  ? "bg-zinc-800 text-zinc-100"
+                  : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200"
+              }`}
+            >
+              Account
+            </button>
+          </div>
+          {section === "profile" &&
+            (!isEditing ? (
               <button
                 type="button"
-                onClick={cancelEditing}
-                className="shrink-0 rounded-md px-3 py-1.5 text-sm font-medium text-zinc-500 transition hover:bg-zinc-900 hover:text-zinc-200"
+                onClick={startEditing}
+                className="shrink-0 rounded-md px-3 py-1.5 text-sm font-medium text-zinc-300 transition hover:bg-zinc-900 hover:text-zinc-100"
               >
-                Cancel
+                Edit profile
               </button>
-              <button
-                type="button"
-                onClick={() => void saveProfile()}
-                disabled={isSaving}
-                className="shrink-0 rounded-md border border-zinc-600 bg-zinc-800 px-3 py-1.5 text-sm font-medium text-zinc-100 transition hover:border-zinc-500 hover:bg-zinc-700"
-              >
-                {isSaving ? "Saving..." : "Save"}
-              </button>
-            </>
-          )}
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={cancelEditing}
+                  className="shrink-0 rounded-md px-3 py-1.5 text-sm font-medium text-zinc-500 transition hover:bg-zinc-900 hover:text-zinc-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void saveProfile()}
+                  disabled={isSaving}
+                  className="shrink-0 rounded-md border border-zinc-600 bg-zinc-800 px-3 py-1.5 text-sm font-medium text-zinc-100 transition hover:border-zinc-500 hover:bg-zinc-700"
+                >
+                  {isSaving ? "Saving..." : "Save"}
+                </button>
+              </>
+            ))}
           <button
             type="button"
             onClick={onClose}
@@ -98,40 +144,49 @@ export default function UserProfilePanel({ open, onClose }: Props) {
         )}
 
         <div className="min-h-0 flex-1 overflow-y-auto">
-          <div className="pt-5">
-            <ProfileAccountSection
-              accountSecured={accountSecured}
-              profile={profile}
-              photoUrl={photoUrl}
-              onAuthed={handleAuthed}
-              onLogout={handleLogout}
-            />
-          </div>
-          <ProfilePhotoSection
-            fileInputRef={fileInputRef}
-            photoUrl={photoUrl}
-            onFileChange={handleFileChange}
-            onRemovePhoto={removePhoto}
-          />
-
-          {photoError && (
-            <p className="mx-5 mt-3 text-sm text-zinc-400" role="alert">
-              {photoError}
-            </p>
-          )}
-
-          <div className="px-5 pt-5">
-            {isEditing ? (
-              <ProfileEditForm draft={draft} setDraft={setDraft} />
-            ) : (
-              <ProfileReadView
+          {section === "account" ? (
+            <div
+              className="pt-5"
+              role="tabpanel"
+              aria-labelledby="user-profile-tab-account"
+            >
+              <ProfileAccountSection
+                accountSecured={accountSecured}
                 profile={profile}
-                displayName={displayName}
-                handleLine={handleLine}
-                bioText={bioText}
+                photoUrl={photoUrl}
+                onAuthed={handleAuthed}
+                onLogout={handleLogout}
               />
-            )}
-          </div>
+            </div>
+          ) : (
+            <div role="tabpanel" aria-labelledby="user-profile-tab-profile">
+              <ProfilePhotoSection
+                fileInputRef={fileInputRef}
+                photoUrl={photoUrl}
+                onFileChange={handleFileChange}
+                onRemovePhoto={removePhoto}
+              />
+
+              {photoError && (
+                <p className="mx-5 mt-3 text-sm text-zinc-400" role="alert">
+                  {photoError}
+                </p>
+              )}
+
+              <div className="px-5 pt-5">
+                {isEditing ? (
+                  <ProfileEditForm draft={draft} setDraft={setDraft} />
+                ) : (
+                  <ProfileReadView
+                    profile={profile}
+                    displayName={displayName}
+                    handleLine={handleLine}
+                    bioText={bioText}
+                  />
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </aside>
     </>
