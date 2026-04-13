@@ -1,14 +1,20 @@
-import { useCallback, useMemo, useState } from "react";
-import Globe from "react-globe.gl";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import Globe, { type GlobeProps } from "react-globe.gl";
 import { Button } from "@/components/ui/button";
 import CountryModal from "./CountryModal";
 import UserProfilePanel from "./UserProfilePanel";
 import type { CountryFeature, CountryWithGeometry } from "../types/country";
 import { countryVisitKey } from "../lib/visitCountryKey";
 import { buildGlobePolygonsData } from "../lib/geo/crimeaReassign";
+import { getGlobeMetallicCapMaterial, tickGlobeMetallicCapMaterials } from "../lib/globeMetallicCapMaterial";
 import { useCountriesData } from "../hooks/useCountriesData";
 import { useGlobeVisitState } from "../hooks/useGlobeVisitState";
-import { hasAnyVisitedLandmarkForCountry } from "../lib/visitStorage";
+import {
+  DEFAULT_VISITED_COUNTRY_COLOR,
+  hasAnyVisitedLandmarkForCountry,
+  isFancyShaderCountryFill,
+  resolveGlobeCountryFill,
+} from "../lib/visitStorage";
 
 export default function GlobeMap() {
   const countries = useCountriesData();
@@ -20,15 +26,51 @@ export default function GlobeMap() {
   const {
     visitedCountries,
     visitedLandmarks,
+    countryFillColors,
     visitEpoch,
     visitsSyncReady,
     handleCountryVisitToggle,
     refreshLandmarksFromStorage,
+    setVisitCountryFillColor,
+    resetVisitCountryFillColor,
   } = useGlobeVisitState(countries.features);
 
   const polygonsData = useMemo(
     () => buildGlobePolygonsData(countries.features),
     [countries.features]
+  );
+
+  const hasMetallicOnGlobe = useMemo(() => {
+    if (!isUserPlanet) return false;
+    return Object.values(countryFillColors).some((c) => isFancyShaderCountryFill(c));
+  }, [isUserPlanet, countryFillColors]);
+
+  useEffect(() => {
+    if (!hasMetallicOnGlobe) return;
+    let frame = 0;
+    const loop = () => {
+      tickGlobeMetallicCapMaterials(performance.now() / 1000);
+      frame = requestAnimationFrame(loop);
+    };
+    frame = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(frame);
+  }, [hasMetallicOnGlobe]);
+
+  const polygonCapMaterial = useCallback(
+    (d: object) => {
+      if (!isUserPlanet) return undefined;
+      const feat = d as CountryFeature;
+      const code = countryVisitKey(feat.properties);
+      const isVisited =
+        visitedCountries.has(code) || hasAnyVisitedLandmarkForCountry(code, visitedLandmarks);
+      if (!isVisited) return undefined;
+      const stored = countryFillColors[code];
+      if (stored && isFancyShaderCountryFill(stored)) {
+        return getGlobeMetallicCapMaterial(stored);
+      }
+      return undefined;
+    },
+    [isUserPlanet, visitedCountries, visitedLandmarks, countryFillColors],
   );
 
   const polygonCapColor = useCallback(
@@ -38,13 +80,16 @@ export default function GlobeMap() {
       const isVisited =
         visitedCountries.has(code) || hasAnyVisitedLandmarkForCountry(code, visitedLandmarks);
       if (isUserPlanet) {
-        if (isVisited) return "#4a9eff";
+        if (isVisited) {
+          const stored = countryFillColors[code];
+          return stored ? resolveGlobeCountryFill(stored) : DEFAULT_VISITED_COUNTRY_COLOR;
+        }
         return d === hoverD ? "#94c5ff" : "#ffffff";
       }
       if (d === hoverD) return "rgba(200, 220, 255, 0.22)";
       return "rgba(0, 0, 0, 0)";
     },
-    [visitedCountries, visitedLandmarks, isUserPlanet, hoverD]
+    [visitedCountries, visitedLandmarks, countryFillColors, isUserPlanet, hoverD]
   );
 
   const polygonSideColor = useCallback(
@@ -54,7 +99,7 @@ export default function GlobeMap() {
 
   const polygonStrokeColor = useCallback(
     (d: object) => {
-      if (isUserPlanet) return "rgba(200, 220, 255, 0.5)";
+      if (isUserPlanet) return null;
       if (d === hoverD) return "rgba(255, 255, 255, 0.5)";
       return "rgba(0, 0, 0, 0)";
     },
@@ -89,6 +134,9 @@ export default function GlobeMap() {
           isUserPlanet ? (d === hoverD ? 0.06 : 0.01) : d === hoverD ? 0.02 : 0.004
         }
         polygonCapColor={polygonCapColor}
+        polygonCapMaterial={
+          polygonCapMaterial as unknown as NonNullable<GlobeProps["polygonCapMaterial"]>
+        }
         polygonSideColor={polygonSideColor}
         polygonStrokeColor={polygonStrokeColor}
         polygonLabel={(d: object) => {
@@ -164,6 +212,13 @@ export default function GlobeMap() {
             handleCountryVisitToggle(countryVisitKey(selectedCountry.properties))
           }
           onLandmarksChanged={refreshLandmarksFromStorage}
+          countryFillColor={countryFillColors[countryVisitKey(selectedCountry.properties)]}
+          onCountryFillColorChange={(hex) =>
+            setVisitCountryFillColor(countryVisitKey(selectedCountry.properties), hex)
+          }
+          onCountryFillColorReset={() =>
+            resetVisitCountryFillColor(countryVisitKey(selectedCountry.properties))
+          }
         />
       )}
     </div>

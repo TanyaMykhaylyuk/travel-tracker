@@ -1,9 +1,11 @@
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CountryWithGeometry } from "../../types/country";
 import { countryVisitKey } from "../../lib/visitCountryKey";
+import { DEFAULT_VISITED_COUNTRY_COLOR, isHexCountryFill } from "../../lib/visitStorage";
 import { useLandmarksForCountry } from "../../hooks/useLandmarksForCountry";
 import { useLandmarkVisits } from "../../hooks/useLandmarkVisits";
 import { CountrySilhouette } from "./CountrySilhouette";
+import { MAP_FILL_PRESETS } from "./mapFillPresets";
 import styles from "./CountryModal.module.css";
 
 type Props = {
@@ -14,6 +16,9 @@ type Props = {
   isCountryVisited: boolean;
   onToggleCountryVisited: () => void;
   onLandmarksChanged?: () => void;
+  countryFillColor?: string;
+  onCountryFillColorChange: (hex: string) => void;
+  onCountryFillColorReset: () => void;
 };
 
 export default function CountryModal({
@@ -24,10 +29,15 @@ export default function CountryModal({
   isCountryVisited,
   onToggleCountryVisited,
   onLandmarksChanged,
+  countryFillColor,
+  onCountryFillColorChange,
+  onCountryFillColorReset,
 }: Props) {
   const code = country.properties.ISO_A2;
   const visitKey = countryVisitKey(country.properties);
   const name = country.properties.ADMIN;
+  const [mapColorOpen, setMapColorOpen] = useState(false);
+  const mapColorToolsRef = useRef<HTMLDivElement>(null);
 
   const { landmarks, landmarksReady, landmarksError } = useLandmarksForCountry(code, name);
   const { toggleVisited, isVisited } = useLandmarkVisits(
@@ -45,6 +55,36 @@ export default function CountryModal({
     return () => window.removeEventListener("keydown", handler);
   }, [onClose]);
 
+  useEffect(() => {
+    if (!mapColorOpen) return;
+    const onPointerDown = (e: MouseEvent | TouchEvent) => {
+      const el = mapColorToolsRef.current;
+      const target = e.target as Node | null;
+      if (el && target && !el.contains(target)) {
+        setMapColorOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("touchstart", onPointerDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("touchstart", onPointerDown);
+    };
+  }, [mapColorOpen]);
+
+  useEffect(() => {
+    setMapColorOpen(false);
+  }, [visitKey]);
+
+  useEffect(() => {
+    if (!isCountryVisited) setMapColorOpen(false);
+  }, [isCountryVisited]);
+
+  const colorInputValue = isHexCountryFill(countryFillColor)
+    ? countryFillColor
+    : "#64748b";
+  const hasCustomMapColor = Boolean(countryFillColor);
+
   return (
     <div
       className={styles.overlay}
@@ -55,28 +95,132 @@ export default function CountryModal({
     >
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
         <div className={styles.header}>
-          <div className="flex flex-col gap-1.5">
+          <div className={styles.headerMain}>
             <h2 id="modal-title" className={styles.title}>
               {name}
             </h2>
-            <div className="flex items-center justify-between gap-4 py-1">
-              <div className="flex flex-col">
-                <span className="text-sm font-medium text-white">Visited</span>
-                <span className="text-xs text-slate-400">Mark this country as visited</span>
+            <div className={styles.headerActionsRow}>
+              <div className="flex items-center justify-between gap-4 py-0.5 min-w-0 flex-1">
+                <div className="flex flex-col min-w-0">
+                  <span className="text-sm font-medium text-white">Visited</span>
+                  <span className="text-xs text-slate-400">Mark this country as visited</span>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={isCountryVisited}
+                  aria-label="Mark country as visited"
+                  disabled={!visitsSyncReady}
+                  onClick={onToggleCountryVisited}
+                  className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-neutral-500 focus:ring-offset-2 focus:ring-offset-[#1a1a1a] ${visitsSyncReady ? "cursor-pointer" : "cursor-wait opacity-60"} ${isCountryVisited ? "bg-neutral-400" : "bg-zinc-600"}`}
+                >
+                  <span
+                    className={`pointer-events-none absolute left-0.5 top-0.5 inline-block h-5 w-5 rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isCountryVisited ? "translate-x-5" : "translate-x-0"}`}
+                  />
+                </button>
               </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={isCountryVisited}
-                aria-label="Color country on map"
-                disabled={!visitsSyncReady}
-                onClick={onToggleCountryVisited}
-                className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-neutral-500 focus:ring-offset-2 focus:ring-offset-[#1a1a1a] ${visitsSyncReady ? "cursor-pointer" : "cursor-wait opacity-60"} ${isCountryVisited ? "bg-neutral-400" : "bg-zinc-600"}`}
-              >
-                <span
-                  className={`pointer-events-none absolute left-0.5 top-0.5 inline-block h-5 w-5 rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isCountryVisited ? "translate-x-5" : "translate-x-0"}`}
-                />
-              </button>
+              <div ref={mapColorToolsRef} className={styles.headerColorWrap}>
+                <button
+                  type="button"
+                  className={styles.mapColorTrigger}
+                  aria-expanded={mapColorOpen}
+                  aria-haspopup="dialog"
+                  aria-label={
+                    isCountryVisited
+                      ? "Відкрити палітру кольорів для глобуса"
+                      : "Спочатку позначте країну як відвідану"
+                  }
+                  title={
+                    isCountryVisited
+                      ? "Колір замальовування на глобусі"
+                      : "Увімкніть «Visited», щоб обрати колір для глобуса"
+                  }
+                  disabled={!visitsSyncReady || !isCountryVisited}
+                  onClick={() => isCountryVisited && setMapColorOpen((o) => !o)}
+                >
+                  <svg
+                    width="22"
+                    height="22"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    aria-hidden="true"
+                    stroke="currentColor"
+                    strokeWidth="1.65"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M11.5 3.5c-4.2 0-7.8 2.6-7.8 6.1 0 1.6.9 3 2.4 4l-.95 2.85 2.95-1.05c.9.45 1.95.65 3.05.65 4.2 0 7.75-2.55 7.75-6.05 0-3.55-3.7-6.4-8.5-6.4Z" />
+                    <circle cx="8.3" cy="9.4" r="1.2" fill="currentColor" stroke="none" />
+                    <circle cx="11.4" cy="7.8" r="1.15" fill="currentColor" stroke="none" />
+                    <circle cx="15.1" cy="8.9" r="1.1" fill="currentColor" stroke="none" />
+                    <circle cx="16.9" cy="12.3" r="1.05" fill="currentColor" stroke="none" />
+                  </svg>
+                </button>
+                {mapColorOpen && isCountryVisited && (
+                  <div
+                    className={`${styles.colorPopover} ${styles.colorPopoverAnchored}`}
+                    role="dialog"
+                    aria-label="Globe fill color"
+                  >
+                    <p className={styles.colorPopoverTitle}>Globe color</p>
+                    <div className={styles.colorSwatchRow}>
+                      {MAP_FILL_PRESETS.map((preset) =>
+                        preset.kind === "hex" ? (
+                          <button
+                            key={preset.value}
+                            type="button"
+                            className={styles.colorSwatch}
+                            style={{ backgroundColor: preset.value }}
+                            aria-label={`Use color ${preset.value}`}
+                            disabled={!visitsSyncReady}
+                            onClick={() => {
+                              if (preset.value === DEFAULT_VISITED_COUNTRY_COLOR) {
+                                onCountryFillColorReset();
+                              } else {
+                                onCountryFillColorChange(preset.value);
+                              }
+                            }}
+                          />
+                        ) : (
+                          <button
+                            key={preset.value}
+                            type="button"
+                            className={`${styles.colorSwatch} ${styles[preset.swatchClass]}`}
+                            aria-label={preset.label}
+                            disabled={!visitsSyncReady}
+                            onClick={() => onCountryFillColorChange(preset.value)}
+                          />
+                        )
+                      )}
+                    </div>
+                    <div className={styles.colorNativeRow}>
+                      <input
+                        type="color"
+                        value={colorInputValue}
+                        aria-label="Custom color"
+                        disabled={!visitsSyncReady}
+                        onChange={(e) => {
+                          const v = e.target.value.toLowerCase();
+                          if (v === DEFAULT_VISITED_COUNTRY_COLOR) {
+                            onCountryFillColorReset();
+                          } else {
+                            onCountryFillColorChange(v);
+                          }
+                        }}
+                      />
+                      <span className={styles.colorNativeLabel}>Custom</span>
+                    </div>
+                    <button
+                      type="button"
+                      className={styles.resetColorBtn}
+                      disabled={!visitsSyncReady || !hasCustomMapColor}
+                      onClick={() => onCountryFillColorReset()}
+                    >
+                      Reset to default blue
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
           <button
@@ -90,7 +234,13 @@ export default function CountryModal({
         </div>
 
         <div className={styles.layout}>
-          <CountrySilhouette geometry={country.geometry} isCountryVisited={isCountryVisited} />
+          <div className={styles.svgContainer}>
+            <CountrySilhouette
+              geometry={country.geometry}
+              isCountryVisited={isCountryVisited}
+              fillColor={countryFillColor}
+            />
+          </div>
 
           <div className={styles.content}>
             {!landmarksReady ? (

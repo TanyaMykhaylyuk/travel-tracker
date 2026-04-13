@@ -3,9 +3,17 @@ import type { CountryFeature } from "../types/country";
 import { migrateVisitedCountriesIsoToAdm0 } from "../lib/geo/migrateVisitedCountriesIsoToAdm0";
 import {
   clearLandmarksForCountry,
+  DEFAULT_VISITED_COUNTRY_COLOR,
+  getCountryFillColors,
   getVisitedCountriesSet,
   getVisitedLandmarksSet,
   hasAnyVisitedLandmarkForCountry,
+  isFancyShaderCountryFill,
+  isHexCountryFill,
+  isPlainMetalCountryFill,
+  pruneCountryFillColors,
+  removeCountryFillColor,
+  saveCountryFillColors,
   saveVisitedCountriesSet,
 } from "../lib/visitStorage";
 import {
@@ -18,16 +26,42 @@ import { useBootstrapUserVisits } from "./useBootstrapUserVisits";
 export function useGlobeVisitState(features: CountryFeature[]) {
   const [visitedCountries, setVisitedCountries] = useState<Set<string>>(getVisitedCountriesSet);
   const [visitedLandmarks, setVisitedLandmarks] = useState<Set<string>>(getVisitedLandmarksSet);
+  const [countryFillColors, setCountryFillColors] = useState<Record<string, string>>(getCountryFillColors);
   const [visitEpoch, setVisitEpoch] = useState(0);
 
   const handleSynced = useCallback((next: Set<string>) => {
     setVisitedCountries(next);
     setVisitedLandmarks(getVisitedLandmarksSet());
+    pruneCountryFillColors();
+    setCountryFillColors(getCountryFillColors());
     setVisitEpoch((e) => e + 1);
   }, []);
 
   const refreshLandmarksFromStorage = useCallback(() => {
     setVisitedLandmarks(getVisitedLandmarksSet());
+    pruneCountryFillColors();
+    setCountryFillColors(getCountryFillColors());
+    setVisitEpoch((e) => e + 1);
+  }, []);
+
+  const setVisitCountryFillColor = useCallback((key: string, color: string) => {
+    let stored: string;
+    if (isFancyShaderCountryFill(color) || isPlainMetalCountryFill(color)) {
+      stored = color;
+    } else if (isHexCountryFill(color)) {
+      stored = `#${color.replace(/^#/, "").toLowerCase()}`;
+    } else {
+      stored = DEFAULT_VISITED_COUNTRY_COLOR;
+    }
+    const next = { ...getCountryFillColors(), [key]: stored };
+    saveCountryFillColors(next);
+    setCountryFillColors(next);
+    setVisitEpoch((e) => e + 1);
+  }, []);
+
+  const resetVisitCountryFillColor = useCallback((key: string) => {
+    removeCountryFillColor(key);
+    setCountryFillColors(getCountryFillColors());
     setVisitEpoch((e) => e + 1);
   }, []);
 
@@ -37,6 +71,8 @@ export function useGlobeVisitState(features: CountryFeature[]) {
     function onVisitsRefresh() {
       setVisitedCountries(new Set(getVisitedCountriesSet()));
       setVisitedLandmarks(new Set(getVisitedLandmarksSet()));
+      pruneCountryFillColors();
+      setCountryFillColors(getCountryFillColors());
       setVisitEpoch((e) => e + 1);
     }
     window.addEventListener(VISITS_REFRESH_EVENT, onVisitsRefresh);
@@ -56,8 +92,10 @@ export function useGlobeVisitState(features: CountryFeature[]) {
         nextCountries.delete(code);
         saveVisitedCountriesSet(nextCountries);
         clearLandmarksForCountry(code);
+        removeCountryFillColor(code);
         setVisitedCountries(nextCountries);
         setVisitedLandmarks(getVisitedLandmarksSet());
+        setCountryFillColors(getCountryFillColors());
         setVisitEpoch((e) => e + 1);
         const uid = getStoredUserId();
         if (uid) {
@@ -100,9 +138,12 @@ export function useGlobeVisitState(features: CountryFeature[]) {
   return {
     visitedCountries,
     visitedLandmarks,
+    countryFillColors,
     visitEpoch,
     visitsSyncReady,
     handleCountryVisitToggle,
     refreshLandmarksFromStorage,
+    setVisitCountryFillColor,
+    resetVisitCountryFillColor,
   };
 }
