@@ -1,6 +1,8 @@
 import mongoose from 'mongoose'
 import type { Request } from 'express'
 import type {
+  AddCountryPhotoBody,
+  PatchCountryPhotosBody,
   AuthClaimBody,
   AuthLoginBody,
   AuthRegisterBody,
@@ -138,4 +140,31 @@ export function parsePatchVisitsBody(
     out.visitedLandmarks = visitedLandmarks
   }
   return out
+}
+
+export function paramCountryCode(req: Request): string {
+  return paramString(req, 'countryCode')
+}
+
+export function parseAddCountryPhotoBody(
+  body: Record<string, unknown>
+): AddCountryPhotoBody {
+  const countryName =
+    typeof body.countryName === 'string' ? body.countryName.trim() : ''
+  const dataUrl = typeof body.dataUrl === 'string' ? body.dataUrl.trim() : ''
+  return { countryName, dataUrl }
+}
+
+export function parsePatchCountryPhotosBody(
+  body: Record<string, unknown>
+): PatchCountryPhotosBody {
+  const raw = body.photoIds
+  if (!Array.isArray(raw)) {
+    return { photoIds: [] }
+  }
+  const photoIds = raw
+    .filter((x): x is string => typeof x === 'string')
+    .map((x) => x.trim())
+    .filter((x) => x.length > 0)
+  return { photoIds }
 }

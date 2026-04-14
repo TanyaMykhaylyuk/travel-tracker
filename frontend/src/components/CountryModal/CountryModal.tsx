@@ -6,6 +6,7 @@ import { useLandmarksForCountry } from "../../hooks/useLandmarksForCountry";
 import { useLandmarkVisits } from "../../hooks/useLandmarkVisits";
 import { CountrySilhouette } from "./CountrySilhouette";
 import { MAP_FILL_PRESETS } from "./mapFillPresets";
+import { CountryPhotoModal } from "./CountryPhotoModal";
 import styles from "./CountryModal.module.css";
 
 type Props = {
@@ -34,9 +35,11 @@ export default function CountryModal({
   onCountryFillColorReset,
 }: Props) {
   const code = country.properties.ISO_A2;
+  const photoCountryCode = country.properties.ADM0_A3;
   const visitKey = countryVisitKey(country.properties);
   const name = country.properties.ADMIN;
   const [mapColorOpen, setMapColorOpen] = useState(false);
+  const [photoModalOpen, setPhotoModalOpen] = useState(false);
   const mapColorToolsRef = useRef<HTMLDivElement>(null);
 
   const { landmarks, landmarksReady, landmarksError } = useLandmarksForCountry(code, name);
@@ -127,13 +130,13 @@ export default function CountryModal({
                   aria-haspopup="dialog"
                   aria-label={
                     isCountryVisited
-                      ? "Відкрити палітру кольорів для глобуса"
-                      : "Спочатку позначте країну як відвідану"
+                      ? "Open globe fill color palette"
+                      : "Mark the country as visited first"
                   }
                   title={
                     isCountryVisited
-                      ? "Колір замальовування на глобусі"
-                      : "Увімкніть «Visited», щоб обрати колір для глобуса"
+                      ? "Globe fill color"
+                      : "Turn on Visited to pick a globe fill color"
                   }
                   disabled={!visitsSyncReady || !isCountryVisited}
                   onClick={() => isCountryVisited && setMapColorOpen((o) => !o)}
@@ -221,6 +224,30 @@ export default function CountryModal({
                   </div>
                 )}
               </div>
+              <button
+                type="button"
+                className={styles.mapColorTrigger}
+                aria-label="Open country photo gallery"
+                title="Country photo gallery"
+                onClick={() => setPhotoModalOpen(true)}
+              >
+                <svg
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  aria-hidden="true"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <rect x="3.5" y="5" width="17" height="14" rx="2.5" />
+                  <path d="M8 13.5 10.8 10.7a1.2 1.2 0 0 1 1.7 0l2.5 2.5" />
+                  <path d="m12.8 12.7 1.3-1.3a1.2 1.2 0 0 1 1.7 0l2.7 2.7" />
+                  <circle cx="9" cy="9" r="1.2" fill="currentColor" stroke="none" />
+                </svg>
+              </button>
             </div>
           </div>
           <button
@@ -274,7 +301,14 @@ export default function CountryModal({
                             className={`absolute inset-0 rounded border ${checked ? "border-transparent bg-black" : "border-slate-500 bg-transparent"}`}
                           />
                           {checked && (
-                            <svg className="relative z-10 h-3.5 w-3.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                            <svg
+                              className="relative z-1 h-3.5 w-3.5 text-white"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="3"
+                              aria-hidden="true"
+                            >
                               <path d="M5 12l5 5L20 7" />
                             </svg>
                           )}
@@ -289,6 +323,13 @@ export default function CountryModal({
           </div>
         </div>
       </div>
+      {photoModalOpen && (
+        <CountryPhotoModal
+          countryCode={photoCountryCode}
+          countryName={name}
+          onClose={() => setPhotoModalOpen(false)}
+        />
+      )}
     </div>
   );
 }

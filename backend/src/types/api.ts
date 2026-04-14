@@ -15,6 +15,19 @@ export type UserVisitsDto = {
   visitedLandmarks: string[]
 }
 
+export type CountryPhotoDto = {
+  id: string
+  dataUrl: string
+  createdAt: string
+}
+
+export type CountryPhotosResponse = {
+  userId: string
+  countryCode: string
+  countryName: string
+  photos: CountryPhotoDto[]
+}
+
 export type CountriesFeaturesResponse = {
   features: unknown
 }
@@ -42,6 +55,15 @@ export type CreateOrUpdateUserBody = {
 export type PatchVisitsBody = {
   visitedCountries?: string[]
   visitedLandmarks?: string[]
+}
+
+export type AddCountryPhotoBody = {
+  countryName: string
+  dataUrl: string
+}
+
+export type PatchCountryPhotosBody = {
+  photoIds: string[]
 }
 
 export type AuthLoginBody = {
