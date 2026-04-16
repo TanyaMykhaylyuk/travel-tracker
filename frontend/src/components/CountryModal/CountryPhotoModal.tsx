@@ -168,12 +168,22 @@ export function CountryPhotoModal({ countryCode, countryName, onClose }: Props) 
     if (photos.length === 0) setEditMode(false);
   }, [photos.length]);
 
-  const applyPhotoIds = async (photoIds: string[]) => {
+  const applyDisplayOrder = async (displayOrdered: CountryPhotoDto[]) => {
     if (!userId) return;
+    const optimisticPhotos = toServerOrderFromDisplay(displayOrdered);
+    const previousPhotos = photos;
+
+    setView({ photos: optimisticPhotos, loadStatus: "ready" });
+    countryPhotosCache.set(countryPhotoCacheKey(userId, countryCode), optimisticPhotos);
     setIsSavingEdits(true);
     setError(null);
+
     try {
-      const data = await patchCountryPhotos(userId, countryCode, photoIds);
+      const data = await patchCountryPhotos(
+        userId,
+        countryCode,
+        optimisticPhotos.map((p) => p.id)
+      );
       countryPhotosCache.set(countryPhotoCacheKey(userId, countryCode), data.photos);
       setView({ photos: data.photos, loadStatus: "ready" });
       if (activePhotoId && !data.photos.some((p) => p.id === activePhotoId)) {
@@ -181,15 +191,12 @@ export function CountryPhotoModal({ countryCode, countryName, onClose }: Props) 
         setActivePhotoId(nextDisplay[0]?.id ?? null);
       }
     } catch (err) {
+      countryPhotosCache.set(countryPhotoCacheKey(userId, countryCode), previousPhotos);
+      setView({ photos: previousPhotos, loadStatus: "ready" });
       setError(err instanceof Error ? err.message : "Could not update photos");
     } finally {
       setIsSavingEdits(false);
     }
-  };
-
-  const applyDisplayOrder = async (displayOrdered: CountryPhotoDto[]) => {
-    const next = toServerOrderFromDisplay(displayOrdered);
-    await applyPhotoIds(next.map((p) => p.id));
   };
 
   const onPickPhoto = async (e: ChangeEvent<HTMLInputElement>) => {
