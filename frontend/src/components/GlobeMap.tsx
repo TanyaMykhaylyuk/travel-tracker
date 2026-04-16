@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Globe, { type GlobeProps } from "react-globe.gl";
 import { Button } from "@/components/ui/button";
 import CountryModal from "./CountryModal";
@@ -18,10 +18,14 @@ import {
 
 export default function GlobeMap() {
   const countries = useCountriesData();
+  const globeRef = useRef<any>(null);
   const [hoverD, setHoverD] = useState<CountryFeature | undefined>();
   const [isUserPlanet, setIsUserPlanet] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState<CountryWithGeometry | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [isFindingTrip, setIsFindingTrip] = useState(false);
+  const [tripResultCountry, setTripResultCountry] = useState<CountryFeature | null>(null);
+  const [isTripBlinkOn, setIsTripBlinkOn] = useState(false);
 
   const {
     visitedCountries,
@@ -44,6 +48,17 @@ export default function GlobeMap() {
     if (!isUserPlanet) return false;
     return Object.values(countryFillColors).some((c) => isFancyShaderCountryFill(c));
   }, [isUserPlanet, countryFillColors]);
+
+  const availableTripCountries = useMemo(
+    () =>
+      polygonsData.filter((country) => {
+        const code = countryVisitKey(country.properties);
+        return !(
+          visitedCountries.has(code) || hasAnyVisitedLandmarkForCountry(code, visitedLandmarks)
+        );
+      }),
+    [polygonsData, visitedCountries, visitedLandmarks]
+  );
 
   useEffect(() => {
     if (!hasMetallicOnGlobe) return;
@@ -76,9 +91,16 @@ export default function GlobeMap() {
   const polygonCapColor = useCallback(
     (d: object) => {
       const feat = d as CountryFeature;
+      const isTripCountry = tripResultCountry === feat;
       const code = countryVisitKey(feat.properties);
       const isVisited =
         visitedCountries.has(code) || hasAnyVisitedLandmarkForCountry(code, visitedLandmarks);
+      if (isUserPlanet && isTripCountry && isTripBlinkOn) {
+        return "#67e8f9";
+      }
+      if (isUserPlanet && isTripCountry) {
+        return "#94c5ff";
+      }
       if (isUserPlanet) {
         if (isVisited) {
           const stored = countryFillColors[code];
@@ -89,22 +111,162 @@ export default function GlobeMap() {
       if (d === hoverD) return "rgba(200, 220, 255, 0.22)";
       return "rgba(0, 0, 0, 0)";
     },
-    [visitedCountries, visitedLandmarks, countryFillColors, isUserPlanet, hoverD]
+    [visitedCountries, visitedLandmarks, countryFillColors, isUserPlanet, hoverD, tripResultCountry, isTripBlinkOn]
   );
 
   const polygonSideColor = useCallback(
-    () => (isUserPlanet ? "rgba(255, 255, 255, 0.3)" : "rgba(0, 0, 0, 0)"),
-    [isUserPlanet]
+    (d: object) => {
+      if (!isUserPlanet) return "rgba(0, 0, 0, 0)";
+      if (tripResultCountry === (d as CountryFeature) && isTripBlinkOn) {
+        return "rgba(103, 232, 249, 0.95)";
+      }
+      if (tripResultCountry === (d as CountryFeature)) {
+        return "rgba(148, 197, 255, 0.72)";
+      }
+      return "rgba(255, 255, 255, 0.3)";
+    },
+    [isUserPlanet, tripResultCountry, isTripBlinkOn]
   );
 
   const polygonStrokeColor = useCallback(
     (d: object) => {
-      if (isUserPlanet) return null;
+      if (isUserPlanet) {
+        if (tripResultCountry === (d as CountryFeature)) {
+          return isTripBlinkOn ? "rgba(224, 242, 254, 0.95)" : "rgba(186, 230, 253, 0.55)";
+        }
+        return null;
+      }
       if (d === hoverD) return "rgba(255, 255, 255, 0.5)";
       return "rgba(0, 0, 0, 0)";
     },
-    [isUserPlanet, hoverD]
+    [isUserPlanet, hoverD, tripResultCountry, isTripBlinkOn]
   );
+
+  useEffect(() => {
+    if (!tripResultCountry) {
+      setIsTripBlinkOn(false);
+      return;
+    }
+    setIsTripBlinkOn(true);
+    const blinkTimer = window.setInterval(() => {
+      setIsTripBlinkOn((prev) => !prev);
+    }, 230);
+    const autoClearTimer = window.setTimeout(() => {
+      setTripResultCountry(null);
+      setHoverD(undefined);
+      setIsTripBlinkOn(false);
+    }, 4200);
+    return () => {
+      window.clearInterval(blinkTimer);
+      window.clearTimeout(autoClearTimer);
+    };
+  }, [tripResultCountry]);
+
+  const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
+
+  const getReadyGlobe = async (attempts = 14, delayMs = 90): Promise<any | null> => {
+    for (let i = 0; i < attempts; i += 1) {
+      const globe = globeRef.current;
+      if (globe?.pointOfView) return globe;
+      await wait(delayMs);
+    }
+    return null;
+  };
+
+  const collectLngLatPairs = (coords: unknown, out: Array<[number, number]>) => {
+    if (!Array.isArray(coords) || coords.length === 0) return;
+    const first = coords[0];
+    const second = coords[1];
+    if (typeof first === "number" && typeof second === "number") {
+      out.push([first, second]);
+      return;
+    }
+    for (const part of coords) {
+      collectLngLatPairs(part, out);
+    }
+  };
+
+  const getCountryFocusPoint = (country: CountryFeature): { lat: number; lng: number } => {
+    const points: Array<[number, number]> = [];
+    collectLngLatPairs((country as any)?.geometry?.coordinates, points);
+    if (points.length === 0) return { lat: 0, lng: 0 };
+
+    let minLng = Number.POSITIVE_INFINITY;
+    let maxLng = Number.NEGATIVE_INFINITY;
+    let minLat = Number.POSITIVE_INFINITY;
+    let maxLat = Number.NEGATIVE_INFINITY;
+
+    for (const [lng, lat] of points) {
+      if (!Number.isFinite(lng) || !Number.isFinite(lat)) continue;
+      minLng = Math.min(minLng, lng);
+      maxLng = Math.max(maxLng, lng);
+      minLat = Math.min(minLat, lat);
+      maxLat = Math.max(maxLat, lat);
+    }
+
+    if (
+      !Number.isFinite(minLng) ||
+      !Number.isFinite(maxLng) ||
+      !Number.isFinite(minLat) ||
+      !Number.isFinite(maxLat)
+    ) {
+      return { lat: 0, lng: 0 };
+    }
+
+    return {
+      lat: Math.max(-82, Math.min(82, (minLat + maxLat) / 2)),
+      lng: (minLng + maxLng) / 2,
+    };
+  };
+
+  const handleFindNextTrip = useCallback(async () => {
+    if (isFindingTrip) return;
+    if (availableTripCountries.length === 0) return;
+
+    setIsFindingTrip(true);
+    try {
+      if (!isUserPlanet) {
+        setIsUserPlanet(true);
+        await wait(260);
+      }
+
+      const globe = await getReadyGlobe();
+      if (!globe) return;
+
+      const controls = globe.controls?.();
+      const spinDurationMs = 1400;
+      const focusDurationMs = 1100;
+
+      if (controls) {
+        controls.autoRotate = true;
+        controls.autoRotateSpeed = 5.2;
+      }
+      await wait(spinDurationMs);
+      if (controls) {
+        controls.autoRotate = false;
+      }
+
+      const randomIndex = Math.floor(Math.random() * availableTripCountries.length);
+      const randomCountry = availableTripCountries[randomIndex] as CountryFeature | undefined;
+      if (randomCountry) {
+        const focusPoint = getCountryFocusPoint(randomCountry);
+
+        globe.pointOfView(
+          {
+            lat: focusPoint.lat,
+            lng: focusPoint.lng,
+            alt: 1.75,
+          },
+          focusDurationMs
+        );
+        await wait(focusDurationMs + 40);
+        setTripResultCountry(randomCountry);
+        setHoverD(randomCountry);
+      }
+    } finally {
+      setIsFindingTrip(false);
+    }
+  }, [isFindingTrip, isUserPlanet, availableTripCountries]);
 
   return (
     <div
@@ -115,8 +277,15 @@ export default function GlobeMap() {
         height: "100vh",
         backgroundColor: "#000",
       }}
+      onPointerDownCapture={() => {
+        if (!tripResultCountry) return;
+        setTripResultCountry(null);
+        setHoverD(undefined);
+        setIsTripBlinkOn(false);
+      }}
     >
       <Globe
+        ref={globeRef}
         globeImageUrl="https://cdn.jsdelivr.net/npm/three-globe/example/img/earth-blue-marble.jpg"
         bumpImageUrl="https://cdn.jsdelivr.net/npm/three-globe/example/img/earth-topology.png"
         backgroundColor="#000"
@@ -131,7 +300,15 @@ export default function GlobeMap() {
         lineHoverPrecision={0}
         polygonsData={polygonsData}
         polygonAltitude={(d: object) =>
-          isUserPlanet ? (d === hoverD ? 0.06 : 0.01) : d === hoverD ? 0.02 : 0.004
+          isUserPlanet
+            ? d === tripResultCountry
+              ? 0.085
+              : d === hoverD
+                ? 0.06
+                : 0.01
+            : d === hoverD
+              ? 0.02
+              : 0.004
         }
         polygonCapColor={polygonCapColor}
         polygonCapMaterial={
@@ -151,6 +328,7 @@ export default function GlobeMap() {
         `;
         }}
         onPolygonHover={(polygon: object | null) => {
+          if (isFindingTrip) return;
           if (!polygon) {
             setHoverD(undefined);
             return;
@@ -162,7 +340,7 @@ export default function GlobeMap() {
             setSelectedCountry(polygon as CountryWithGeometry);
           }
         }}
-        polygonsTransitionDuration={300}
+        polygonsTransitionDuration={500}
       />
       {isUserPlanet && (
         <>
@@ -179,6 +357,21 @@ export default function GlobeMap() {
           </button>
           <UserProfilePanel open={profileOpen} onClose={() => setProfileOpen(false)} />
         </>
+      )}
+      {isUserPlanet && (
+        <Button
+          type="button"
+          className="absolute bottom-20 right-6 z-20 rounded-full border border-cyan-300/70 bg-slate-950/80 px-5 py-2 text-cyan-100 shadow-[0_0_8px_rgba(34,211,238,0.8),0_0_20px_rgba(56,189,248,0.45),inset_0_0_12px_rgba(34,211,238,0.35)] transition hover:border-cyan-200 hover:text-white hover:shadow-[0_0_12px_rgba(34,211,238,0.95),0_0_28px_rgba(56,189,248,0.6),inset_0_0_14px_rgba(125,211,252,0.5)] disabled:cursor-wait disabled:opacity-80"
+          onClick={() => void handleFindNextTrip()}
+          disabled={isFindingTrip || availableTripCountries.length === 0}
+          aria-label="Find my next trip"
+        >
+          {isFindingTrip
+            ? "Finding…"
+            : availableTripCountries.length === 0
+              ? "All countries visited"
+              : "Find My Next Trip"}
+        </Button>
       )}
       <Button
         type="button"
