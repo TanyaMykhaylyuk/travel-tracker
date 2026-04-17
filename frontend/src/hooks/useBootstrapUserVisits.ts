@@ -8,6 +8,7 @@ import {
   syncVisitsToServer,
 } from "../lib/userApi";
 import {
+  getCountryFillColors,
   getVisitedCountriesSet,
   getVisitedLandmarksSet,
 } from "../lib/visitStorage";
@@ -25,6 +26,7 @@ export function useBootstrapUserVisits(
     void (async () => {
       const migrationCountries = [...getVisitedCountriesSet()];
       const migrationLandmarks = [...getVisitedLandmarksSet()];
+      const migrationCountryFillColors = getCountryFillColors();
 
       let id = getStoredUserId();
       if (id) {
@@ -47,6 +49,7 @@ export function useBootstrapUserVisits(
         const user = await bootstrapAnonymousUser({
           visitedCountries: migrationCountries,
           visitedLandmarks: migrationLandmarks,
+          countryFillColors: migrationCountryFillColors,
         });
         if (cancelled) return;
         setStoredUserId(user.id);

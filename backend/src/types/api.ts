@@ -6,6 +6,7 @@ export type UserPublicDto = {
   photoDataUrl: string
   visitedCountries: string[]
   visitedLandmarks: string[]
+  countryFillColors: Record<string, string>
   hasPassword?: boolean
 }
 
@@ -13,6 +14,7 @@ export type UserVisitsDto = {
   id: string
   visitedCountries: string[]
   visitedLandmarks: string[]
+  countryFillColors: Record<string, string>
 }
 
 export type CountryPhotoDto = {
@@ -50,11 +52,13 @@ export type CreateOrUpdateUserBody = {
   photoDataUrl: string
   visitedCountries: string[]
   visitedLandmarks: string[]
+  countryFillColors: Record<string, string>
 }
 
 export type PatchVisitsBody = {
   visitedCountries?: string[]
   visitedLandmarks?: string[]
+  countryFillColors?: Record<string, string>
 }
 
 export type AddCountryPhotoBody = {
@@ -79,6 +83,7 @@ export type AuthRegisterBody = {
   photoDataUrl: string
   visitedCountries: string[]
   visitedLandmarks: string[]
+  countryFillColors: Record<string, string>
 }
 
 export type AuthClaimBody = AuthRegisterBody & {

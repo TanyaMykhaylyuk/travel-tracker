@@ -6,6 +6,7 @@ export const CSV_COUNTRY_TO_CCA2: Record<string, string> = {
   "Congo (Democratic Republic of the)": "CD",
   "Czech Republic": "CZ",
   "United States": "US",
+  "Puerto Rico": "PR",
   "Côte d'Ivoire": "CI",
   "Côte d’Ivoire": "CI",
   "North Macedonia": "MK",

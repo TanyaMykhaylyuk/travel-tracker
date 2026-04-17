@@ -7,6 +7,7 @@ import {
   registerNewAccount,
 } from "../../lib/userApi";
 import {
+  getCountryFillColors,
   getVisitedCountriesSet,
   getVisitedLandmarksSet,
 } from "../../lib/visitStorage";
@@ -59,6 +60,7 @@ export function ProfileAccountSection({
     () => ({
       visitedCountries: [...getVisitedCountriesSet()],
       visitedLandmarks: [...getVisitedLandmarksSet()],
+      countryFillColors: getCountryFillColors(),
     }),
     []
   );

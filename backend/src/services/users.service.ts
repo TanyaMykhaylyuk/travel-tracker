@@ -11,6 +11,24 @@ import type {
   UserVisitsDto,
 } from '../types/api'
 
+function toStringRecord(value: unknown): Record<string, string> {
+  if (value instanceof Map) {
+    return Object.fromEntries(
+      [...value.entries()].filter(
+        (entry): entry is [string, string] =>
+          typeof entry[0] === 'string' && typeof entry[1] === 'string'
+      )
+    )
+  }
+  if (typeof value !== 'object' || value === null) return {}
+  return Object.fromEntries(
+    Object.entries(value).filter(
+      (entry): entry is [string, string] =>
+        typeof entry[0] === 'string' && typeof entry[1] === 'string'
+    )
+  )
+}
+
 export function toPublicDto(doc: {
   _id: unknown
   handle: string
@@ -19,8 +37,10 @@ export function toPublicDto(doc: {
   photoDataUrl: string
   visitedCountries: string[]
   visitedLandmarks: string[]
+  countryFillColors?: unknown
   passwordHash?: string
 }): UserPublicDto {
+  const countryFillColors = toStringRecord(doc.countryFillColors)
   return {
     id: String(doc._id),
     handle: doc.handle,
@@ -29,6 +49,7 @@ export function toPublicDto(doc: {
     photoDataUrl: doc.photoDataUrl,
     visitedCountries: doc.visitedCountries,
     visitedLandmarks: doc.visitedLandmarks,
+    countryFillColors,
     hasPassword: Boolean(doc.passwordHash),
   }
 }
@@ -49,6 +70,7 @@ function validateUserInput(body: CreateOrUpdateUserBody): void {
 export async function bootstrapAnonymousUser(visits: {
   visitedCountries: string[]
   visitedLandmarks: string[]
+  countryFillColors: Record<string, string>
 }): Promise<UserPublicDto> {
   const handle = `u${new mongoose.Types.ObjectId().toString()}`
   try {
@@ -59,6 +81,7 @@ export async function bootstrapAnonymousUser(visits: {
       photoDataUrl: '',
       visitedCountries: visits.visitedCountries,
       visitedLandmarks: visits.visitedLandmarks,
+      countryFillColors: visits.countryFillColors,
     })
     return toPublicDto(doc.toObject())
   } catch (e: unknown) {
@@ -80,6 +103,7 @@ export async function createOrUpdateUser(
     photoDataUrl,
     visitedCountries,
     visitedLandmarks,
+    countryFillColors,
   } = body
 
   try {
@@ -104,6 +128,7 @@ export async function createOrUpdateUser(
             photoDataUrl,
             visitedCountries,
             visitedLandmarks,
+            countryFillColors,
           },
         },
         { new: true, runValidators: true }
@@ -128,6 +153,7 @@ export async function createOrUpdateUser(
           photoDataUrl,
           visitedCountries,
           visitedLandmarks,
+          countryFillColors,
         },
       },
       { new: true, upsert: true, runValidators: true }
@@ -170,8 +196,8 @@ export async function patchUserVisits(
     throw new HttpError(400, 'Invalid user id')
   }
 
-  const { visitedCountries, visitedLandmarks } = body
-  if (visitedCountries === undefined && visitedLandmarks === undefined) {
+  const { visitedCountries, visitedLandmarks, countryFillColors } = body
+  if (visitedCountries === undefined && visitedLandmarks === undefined && countryFillColors === undefined) {
     throw new HttpError(400, 'Nothing to update')
   }
 
@@ -182,6 +208,7 @@ export async function patchUserVisits(
         $set: {
           ...(visitedCountries !== undefined ? { visitedCountries } : {}),
           ...(visitedLandmarks !== undefined ? { visitedLandmarks } : {}),
+          ...(countryFillColors !== undefined ? { countryFillColors } : {}),
         },
       },
       { new: true }
@@ -193,6 +220,7 @@ export async function patchUserVisits(
       id: String(doc._id),
       visitedCountries: doc.visitedCountries,
       visitedLandmarks: doc.visitedLandmarks,
+      countryFillColors: toStringRecord(doc.countryFillColors),
     }
   } catch (e: unknown) {
     if (e instanceof HttpError) throw e

@@ -8,6 +8,24 @@ import { toPublicDto } from './users.service'
 
 const SALT_ROUNDS = 10
 
+function toStringRecord(value: unknown): Record<string, string> {
+  if (value instanceof Map) {
+    return Object.fromEntries(
+      [...value.entries()].filter(
+        (entry): entry is [string, string] =>
+          typeof entry[0] === 'string' && typeof entry[1] === 'string'
+      )
+    )
+  }
+  if (typeof value !== 'object' || value === null) return {}
+  return Object.fromEntries(
+    Object.entries(value).filter(
+      (entry): entry is [string, string] =>
+        typeof entry[0] === 'string' && typeof entry[1] === 'string'
+    )
+  )
+}
+
 function assertPassword(plain: string): void {
   if (typeof plain !== 'string' || plain.length < 8 || plain.length > 128) {
     throw new HttpError(400, 'Password must be 8–128 characters.')
@@ -41,6 +59,7 @@ export async function registerWithPassword(input: {
   photoDataUrl: string
   visitedCountries: string[]
   visitedLandmarks: string[]
+  countryFillColors: Record<string, string>
 }): Promise<UserPublicDto> {
   assertPassword(input.password)
   const handle = input.handle.toLowerCase().trim().replace(/^@+/, '')
@@ -64,6 +83,7 @@ export async function registerWithPassword(input: {
       photoDataUrl: input.photoDataUrl,
       visitedCountries: input.visitedCountries,
       visitedLandmarks: input.visitedLandmarks,
+      countryFillColors: input.countryFillColors,
       passwordHash,
     })
     const plain = doc.toObject()
@@ -86,6 +106,7 @@ export async function claimAccountWithPassword(input: {
   photoDataUrl: string
   visitedCountries: string[]
   visitedLandmarks: string[]
+  countryFillColors: Record<string, string>
 }): Promise<UserPublicDto> {
   assertPassword(input.password)
   if (!isValidObjectId(input.userId)) {
@@ -123,6 +144,10 @@ export async function claimAccountWithPassword(input: {
   const visitedLandmarks = [
     ...new Set([...prev.visitedLandmarks, ...input.visitedLandmarks]),
   ]
+  const countryFillColors = {
+    ...toStringRecord(prev.countryFillColors),
+    ...input.countryFillColors,
+  }
 
   const doc = await UserModel.findByIdAndUpdate(
     input.userId,
@@ -134,6 +159,7 @@ export async function claimAccountWithPassword(input: {
         photoDataUrl: input.photoDataUrl,
         visitedCountries,
         visitedLandmarks,
+        countryFillColors,
         passwordHash,
       },
     },

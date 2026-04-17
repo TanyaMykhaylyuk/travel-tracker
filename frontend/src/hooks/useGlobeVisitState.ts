@@ -57,12 +57,20 @@ export function useGlobeVisitState(features: CountryFeature[]) {
     saveCountryFillColors(next);
     setCountryFillColors(next);
     setVisitEpoch((e) => e + 1);
+    const uid = getStoredUserId();
+    if (uid) {
+      void syncVisitsToServer(uid).catch(() => {});
+    }
   }, []);
 
   const resetVisitCountryFillColor = useCallback((key: string) => {
     removeCountryFillColor(key);
     setCountryFillColors(getCountryFillColors());
     setVisitEpoch((e) => e + 1);
+    const uid = getStoredUserId();
+    if (uid) {
+      void syncVisitsToServer(uid).catch(() => {});
+    }
   }, []);
 
   const visitsSyncReady = useBootstrapUserVisits(handleSynced);

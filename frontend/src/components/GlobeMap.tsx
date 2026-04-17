@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Globe, { type GlobeProps } from "react-globe.gl";
 import { Button } from "@/components/ui/button";
 import CountryModal from "./CountryModal";
+import { TripSuggestionModal } from "./CountryModal/TripSuggestionModal";
 import UserProfilePanel from "./UserProfilePanel";
 import type { CountryFeature, CountryWithGeometry } from "../types/country";
 import { countryVisitKey } from "../lib/visitCountryKey";
@@ -26,6 +27,7 @@ export default function GlobeMap() {
   const [isFindingTrip, setIsFindingTrip] = useState(false);
   const [tripResultCountry, setTripResultCountry] = useState<CountryFeature | null>(null);
   const [isTripBlinkOn, setIsTripBlinkOn] = useState(false);
+  const [isTripSuggestionOpen, setIsTripSuggestionOpen] = useState(false);
 
   const {
     visitedCountries,
@@ -134,7 +136,10 @@ export default function GlobeMap() {
         if (tripResultCountry === (d as CountryFeature)) {
           return isTripBlinkOn ? "rgba(224, 242, 254, 0.95)" : "rgba(186, 230, 253, 0.55)";
         }
-        return null;
+        if (d === hoverD) {
+          return "rgba(15, 23, 42, 0.95)";
+        }
+        return "rgba(15, 23, 42, 0.78)";
       }
       if (d === hoverD) return "rgba(255, 255, 255, 0.5)";
       return "rgba(0, 0, 0, 0)";
@@ -151,16 +156,21 @@ export default function GlobeMap() {
     const blinkTimer = window.setInterval(() => {
       setIsTripBlinkOn((prev) => !prev);
     }, 230);
-    const autoClearTimer = window.setTimeout(() => {
-      setTripResultCountry(null);
-      setHoverD(undefined);
-      setIsTripBlinkOn(false);
-    }, 4200);
+    const openModalTimer = window.setTimeout(() => {
+      setIsTripSuggestionOpen(true);
+    }, 500);
     return () => {
       window.clearInterval(blinkTimer);
-      window.clearTimeout(autoClearTimer);
+      window.clearTimeout(openModalTimer);
     };
   }, [tripResultCountry]);
+
+  const closeTripSuggestion = useCallback(() => {
+    setIsTripSuggestionOpen(false);
+    setTripResultCountry(null);
+    setHoverD(undefined);
+    setIsTripBlinkOn(false);
+  }, []);
 
   const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
@@ -250,11 +260,12 @@ export default function GlobeMap() {
       const randomCountry = availableTripCountries[randomIndex] as CountryFeature | undefined;
       if (randomCountry) {
         const focusPoint = getCountryFocusPoint(randomCountry);
+        const modalOffsetLng = 22;
 
         globe.pointOfView(
           {
             lat: focusPoint.lat,
-            lng: focusPoint.lng,
+            lng: focusPoint.lng + modalOffsetLng,
             alt: 1.75,
           },
           focusDurationMs
@@ -276,12 +287,6 @@ export default function GlobeMap() {
         width: "100vw",
         height: "100vh",
         backgroundColor: "#000",
-      }}
-      onPointerDownCapture={() => {
-        if (!tripResultCountry) return;
-        setTripResultCountry(null);
-        setHoverD(undefined);
-        setIsTripBlinkOn(false);
       }}
     >
       <Globe
@@ -412,6 +417,12 @@ export default function GlobeMap() {
           onCountryFillColorReset={() =>
             resetVisitCountryFillColor(countryVisitKey(selectedCountry.properties))
           }
+        />
+      )}
+      {isTripSuggestionOpen && tripResultCountry && (
+        <TripSuggestionModal
+          country={tripResultCountry}
+          onClose={closeTripSuggestion}
         />
       )}
     </div>

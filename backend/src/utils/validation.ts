@@ -43,6 +43,15 @@ function stringArrayFromBody(value: unknown): string[] | undefined {
   return value.filter((x): x is string => typeof x === 'string')
 }
 
+function stringRecordFromBody(value: unknown): Record<string, string> | undefined {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined
+  const out: Record<string, string> = {}
+  for (const [k, v] of Object.entries(value)) {
+    if (typeof v === 'string') out[k] = v
+  }
+  return out
+}
+
 export function parseCreateOrUpdateUserBody(
   body: Record<string, unknown>
 ): CreateOrUpdateUserBody {
@@ -60,6 +69,7 @@ export function parseCreateOrUpdateUserBody(
   const visitedLandmarks = Array.isArray(body.visitedLandmarks)
     ? body.visitedLandmarks.filter((x): x is string => typeof x === 'string')
     : []
+  const countryFillColors = stringRecordFromBody(body.countryFillColors) ?? {}
 
   return {
     id: idRaw,
@@ -69,12 +79,14 @@ export function parseCreateOrUpdateUserBody(
     photoDataUrl,
     visitedCountries,
     visitedLandmarks,
+    countryFillColors,
   }
 }
 
 export function parseBootstrapUserBody(body: Record<string, unknown>): {
   visitedCountries: string[]
   visitedLandmarks: string[]
+  countryFillColors: Record<string, string>
 } {
   const visitedCountries = Array.isArray(body.visitedCountries)
     ? body.visitedCountries.filter((x): x is string => typeof x === 'string')
@@ -82,7 +94,8 @@ export function parseBootstrapUserBody(body: Record<string, unknown>): {
   const visitedLandmarks = Array.isArray(body.visitedLandmarks)
     ? body.visitedLandmarks.filter((x): x is string => typeof x === 'string')
     : []
-  return { visitedCountries, visitedLandmarks }
+  const countryFillColors = stringRecordFromBody(body.countryFillColors) ?? {}
+  return { visitedCountries, visitedLandmarks, countryFillColors }
 }
 
 function authProfilePayload(body: Record<string, unknown>): AuthRegisterBody {
@@ -100,6 +113,7 @@ function authProfilePayload(body: Record<string, unknown>): AuthRegisterBody {
   const visitedLandmarks = Array.isArray(body.visitedLandmarks)
     ? body.visitedLandmarks.filter((x): x is string => typeof x === 'string')
     : []
+  const countryFillColors = stringRecordFromBody(body.countryFillColors) ?? {}
   return {
     handle,
     displayName,
@@ -108,6 +122,7 @@ function authProfilePayload(body: Record<string, unknown>): AuthRegisterBody {
     photoDataUrl,
     visitedCountries,
     visitedLandmarks,
+    countryFillColors,
   }
 }
 
@@ -132,12 +147,16 @@ export function parsePatchVisitsBody(
 ): PatchVisitsBody {
   const visitedCountries = stringArrayFromBody(body.visitedCountries)
   const visitedLandmarks = stringArrayFromBody(body.visitedLandmarks)
+  const countryFillColors = stringRecordFromBody(body.countryFillColors)
   const out: PatchVisitsBody = {}
   if (visitedCountries !== undefined) {
     out.visitedCountries = visitedCountries
   }
   if (visitedLandmarks !== undefined) {
     out.visitedLandmarks = visitedLandmarks
+  }
+  if (countryFillColors !== undefined) {
+    out.countryFillColors = countryFillColors
   }
   return out
 }

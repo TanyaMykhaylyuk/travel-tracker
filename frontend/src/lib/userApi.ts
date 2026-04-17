@@ -1,7 +1,9 @@
 import {
   clearAllVisitData,
+  getCountryFillColors,
   getVisitedCountriesSet,
   getVisitedLandmarksSet,
+  saveCountryFillColors,
   saveVisitedCountriesSet,
   saveVisitedLandmarksSet,
 } from "./visitStorage";
@@ -39,12 +41,14 @@ export type ServerUser = {
   photoDataUrl: string;
   visitedCountries: string[];
   visitedLandmarks: string[];
+  countryFillColors?: Record<string, string>;
   hasPassword?: boolean;
 };
 
 export async function bootstrapAnonymousUser(body: {
   visitedCountries: string[];
   visitedLandmarks: string[];
+  countryFillColors?: Record<string, string>;
 }): Promise<ServerUser> {
   const res = await fetch("/api/users/bootstrap", {
     method: "POST",
@@ -66,6 +70,7 @@ export async function registerOrUpdateUser(body: {
   photoDataUrl: string;
   visitedCountries: string[];
   visitedLandmarks: string[];
+  countryFillColors?: Record<string, string>;
 }): Promise<ServerUser> {
   const res = await fetch("/api/users", {
     method: "POST",
@@ -91,25 +96,31 @@ export async function fetchUser(id: string): Promise<ServerUser> {
 export function applyServerVisitsToStorage(user: ServerUser): boolean {
   const localCountries = getVisitedCountriesSet();
   const localLandmarks = getVisitedLandmarksSet();
+  const localColors = getCountryFillColors();
   const serverCountries = new Set(user.visitedCountries);
   const serverLandmarks = new Set(user.visitedLandmarks);
+  const serverColors = user.countryFillColors ?? {};
   const mergedCountries = new Set([...user.visitedCountries, ...localCountries]);
   const mergedLandmarks = new Set([...user.visitedLandmarks, ...localLandmarks]);
+  const mergedColors: Record<string, string> = { ...serverColors, ...localColors };
   saveVisitedCountriesSet(mergedCountries);
   saveVisitedLandmarksSet(mergedLandmarks);
+  saveCountryFillColors(mergedColors);
   return (
     [...localLandmarks].some((k) => !serverLandmarks.has(k)) ||
-    [...localCountries].some((c) => !serverCountries.has(c))
+    [...localCountries].some((c) => !serverCountries.has(c)) ||
+    Object.entries(localColors).some(([key, value]) => serverColors[key] !== value)
   );
 }
 
 export async function syncVisitsToServer(userId: string): Promise<void> {
   const visitedCountries = [...getVisitedCountriesSet()];
   const visitedLandmarks = [...getVisitedLandmarksSet()];
+  const countryFillColors = getCountryFillColors();
   const res = await fetch(`/api/users/${encodeURIComponent(userId)}/visits`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ visitedCountries, visitedLandmarks }),
+    body: JSON.stringify({ visitedCountries, visitedLandmarks, countryFillColors }),
   });
   if (!res.ok) {
     const data = (await res.json()) as { error?: string };
@@ -154,6 +165,7 @@ export async function registerNewAccount(body: {
   photoDataUrl: string;
   visitedCountries: string[];
   visitedLandmarks: string[];
+  countryFillColors?: Record<string, string>;
 }): Promise<ServerUser> {
   const res = await fetch("/api/auth/register", {
     method: "POST",
@@ -177,6 +189,7 @@ export async function claimAccountWithPassword(body: {
   photoDataUrl: string;
   visitedCountries: string[];
   visitedLandmarks: string[];
+  countryFillColors?: Record<string, string>;
 }): Promise<ServerUser> {
   const res = await fetch("/api/auth/claim", {
     method: "POST",

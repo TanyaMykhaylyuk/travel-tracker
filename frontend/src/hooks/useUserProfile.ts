@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  getCountryFillColors,
   getVisitedCountriesSet,
   getVisitedLandmarksSet,
 } from "../lib/visitStorage";
@@ -40,6 +41,7 @@ export function useUserProfile(open: boolean, onClose: () => void) {
         photoDataUrl: nextPhotoUrl ?? "",
         visitedCountries: [...getVisitedCountriesSet()],
         visitedLandmarks: [...getVisitedLandmarksSet()],
+        countryFillColors: getCountryFillColors(),
       });
       setProfile({
         displayName: user.displayName,
