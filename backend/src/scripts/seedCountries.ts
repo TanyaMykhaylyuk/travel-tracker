@@ -6,7 +6,7 @@ import { CountryCollectionModel } from "../models/Country";
 
 const GEOJSON_PATH = path.join(
   __dirname,
-  "../../../frontend/public/datasets/ne_110m_admin_0_countries.geojson"
+  "../../data/ne_110m_admin_0_countries.geojson"
 );
 
 type RawGeoJson = {

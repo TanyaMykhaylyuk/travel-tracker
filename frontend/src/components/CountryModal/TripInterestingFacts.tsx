@@ -1,34 +1,19 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { getCountryFacts } from "../../lib/countryFacts";
+import { fetchCountryFactsByName } from "../../lib/countryFactsApi";
 
 const PLACEHOLDER_TEXT = "Interesting facts will appear here";
 
-const FONT_PRESETS: { fz: number; lh: number }[] = [
-  { fz: 16, lh: 1.65 },
-  { fz: 15, lh: 1.52 },
-  { fz: 14, lh: 1.45 },
-  { fz: 13, lh: 1.38 },
-  { fz: 12, lh: 1.32 },
-  { fz: 11, lh: 1.28 },
-  { fz: 10, lh: 1.24 },
-];
-
-const MIN_SCALE = 0.48;
+const MAX_FONT_PX = 16;
+const MIN_FONT_PX = 7;
 
 type Fit = {
   fontPx: number;
   lh: number;
-  scale: number;
-  boxH: number;
-  boxW: number;
 };
 
 const defaultFit: Fit = {
   fontPx: 16,
   lh: 1.65,
-  scale: 1,
-  boxH: 0,
-  boxW: 0,
 };
 
 type Props = {
@@ -49,54 +34,73 @@ function measureParagraphFit(
   const maxW = outer.clientWidth;
   if (maxH < 8 || maxW < 8) return null;
 
-  p.style.transform = "";
-  p.style.position = "relative";
-  p.style.inset = "";
+  const lineHeightFor = (fontPx: number) => {
+    const t = (fontPx - MIN_FONT_PX) / (MAX_FONT_PX - MIN_FONT_PX);
+    return 1.16 + t * (1.65 - 1.16);
+  };
 
-  let chosen = FONT_PRESETS[FONT_PRESETS.length - 1]!;
-  for (const preset of FONT_PRESETS) {
-    p.style.fontSize = `${preset.fz}px`;
-    p.style.lineHeight = String(preset.lh);
-    if (p.scrollHeight <= maxH && p.scrollWidth <= maxW) {
-      chosen = preset;
-      break;
+  const fits = (fontPx: number) => {
+    p.style.fontSize = `${fontPx}px`;
+    p.style.lineHeight = String(lineHeightFor(fontPx));
+    return p.scrollHeight <= maxH && p.scrollWidth <= maxW;
+  };
+
+  let low = MIN_FONT_PX;
+  let high = MAX_FONT_PX;
+  let best = MIN_FONT_PX;
+
+  while (high - low > 0.25) {
+    const mid = (low + high) / 2;
+    if (fits(mid)) {
+      best = mid;
+      low = mid;
+    } else {
+      high = mid;
     }
   }
 
-  p.style.fontSize = `${chosen.fz}px`;
-  p.style.lineHeight = String(chosen.lh);
-
-  const naturalH = p.scrollHeight;
-  const naturalW = p.scrollWidth;
-  const scale = Math.min(
-    1,
-    Math.max(
-      MIN_SCALE,
-      Math.min(maxH / Math.max(naturalH, 1), maxW / Math.max(naturalW, 1))
-    )
-  );
+  p.style.fontSize = `${best}px`;
+  p.style.lineHeight = String(lineHeightFor(best));
 
   return {
-    fontPx: chosen.fz,
-    lh: chosen.lh,
-    scale,
-    boxH: naturalH * scale,
-    boxW: naturalW * scale,
+    fontPx: best,
+    lh: lineHeightFor(best),
   };
 }
 
 export function TripInterestingFacts({ tripResetKey, countryName }: Props) {
   const [displayed, setDisplayed] = useState("");
   const [typingDone, setTypingDone] = useState(false);
+  const [factsText, setFactsText] = useState(PLACEHOLDER_TEXT);
   const outerRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<HTMLParagraphElement>(null);
   const [fit, setFit] = useState<Fit>(defaultFit);
 
   const fullText = useMemo(() => {
     if (!tripResetKey || !countryName) return PLACEHOLDER_TEXT;
-    const facts = getCountryFacts(countryName);
-    if (facts.length === 0) return PLACEHOLDER_TEXT;
-    return facts.join("\n\n");
+    return factsText;
+  }, [tripResetKey, countryName, factsText]);
+
+  useEffect(() => {
+    if (!tripResetKey || !countryName) {
+      setFactsText(PLACEHOLDER_TEXT);
+      return;
+    }
+
+    let cancelled = false;
+    void fetchCountryFactsByName(countryName)
+      .then((facts) => {
+        if (cancelled) return;
+        setFactsText(facts.length ? facts.join("\n\n") : PLACEHOLDER_TEXT);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setFactsText(PLACEHOLDER_TEXT);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [tripResetKey, countryName]);
 
   const applyFit = useCallback(() => {
@@ -149,28 +153,13 @@ export function TripInterestingFacts({ tripResetKey, countryName }: Props) {
 
   if (!tripResetKey) return null;
 
-  const scaled = fit.scale < 0.999;
-
   return (
     <div
       ref={outerRef}
       className="pointer-events-none fixed bottom-6 left-6 z-30 flex max-h-[min(85dvh,calc(100dvh-4.5rem))] w-[min(28rem,calc(100vw-3rem))] flex-col justify-end overflow-hidden"
       aria-live="polite"
     >
-      <div
-        className="flex min-h-0 flex-col justify-end"
-        style={
-          scaled
-            ? {
-                height: fit.boxH,
-                width: fit.boxW,
-                maxWidth: "100%",
-                overflow: "hidden",
-                position: "relative",
-              }
-            : undefined
-        }
-      >
+      <div className="flex min-h-0 flex-col justify-end">
         <p
           ref={textRef}
           className="whitespace-pre-wrap font-mono tracking-wide"
@@ -181,11 +170,6 @@ export function TripInterestingFacts({ tripResetKey, countryName }: Props) {
             maxWidth: "100%",
             textShadow:
               "0 0 6px rgba(34, 211, 238, 0.95), 0 0 14px rgba(56, 189, 248, 0.75), 0 0 24px rgba(34, 211, 238, 0.45)",
-            transform: scaled ? `scale(${fit.scale})` : undefined,
-            transformOrigin: "left bottom",
-            position: scaled ? "absolute" : "relative",
-            bottom: scaled ? 0 : undefined,
-            left: scaled ? 0 : undefined,
           }}
         >
           {displayed}

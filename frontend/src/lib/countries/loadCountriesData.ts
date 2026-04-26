@@ -12,12 +12,5 @@ export async function loadCountriesData(): Promise<CountriesData> {
   } catch {
     void 0;
   }
-
-  try {
-    const local = await fetch("/datasets/ne_110m_admin_0_countries.geojson");
-    const data = (await local.json()) as Partial<CountriesData>;
-    return { features: Array.isArray(data.features) ? data.features : [] };
-  } catch {
-    return { features: [] };
-  }
+  return { features: [] };
 }

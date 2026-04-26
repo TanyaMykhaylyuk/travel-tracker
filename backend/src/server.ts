@@ -2,6 +2,8 @@ import express from 'express'
 import cors from 'cors'
 import authRouter from './routes/auth.routes'
 import countriesRouter from './routes/countries.routes'
+import countryFactsRouter from './routes/countryFacts.routes'
+import countryMetaRouter from './routes/countryMeta.routes'
 import landmarksRouter from './routes/landmarks.routes'
 import usersRouter from './routes/users.routes'
 
@@ -12,6 +14,8 @@ app.use(express.json({ limit: '10mb' }))
 
 app.use('/api', authRouter)
 app.use('/api', countriesRouter)
+app.use('/api', countryFactsRouter)
+app.use('/api', countryMetaRouter)
 app.use('/api', landmarksRouter)
 app.use('/api', usersRouter)
 

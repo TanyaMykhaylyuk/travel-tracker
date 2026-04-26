@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Globe, { type GlobeProps } from "react-globe.gl";
 import { Button } from "@/components/ui/button";
 import CountryModal from "./CountryModal";
+import { TripInterestingFacts } from "./CountryModal/TripInterestingFacts";
 import { TripSuggestionModal } from "./CountryModal/TripSuggestionModal";
 import UserProfilePanel from "./UserProfilePanel";
 import type { CountryFeature, CountryWithGeometry } from "../types/country";
@@ -17,6 +18,30 @@ import {
   resolveGlobeCountryFill,
 } from "../lib/visitStorage";
 
+function isNorthBrazilCoastalFragment(feature: CountryFeature): boolean {
+  const geometry = (feature as CountryWithGeometry).geometry;
+  if (!geometry) return false;
+  const polygons = geometry.type === "Polygon" ? [geometry.coordinates] : geometry.coordinates;
+  for (const polygon of polygons) {
+    const ring = polygon[0] ?? [];
+    if (!ring.length) continue;
+    let minLon = Infinity;
+    let maxLon = -Infinity;
+    let minLat = Infinity;
+    let maxLat = -Infinity;
+    for (const [lon, lat] of ring) {
+      minLon = Math.min(minLon, lon);
+      maxLon = Math.max(maxLon, lon);
+      minLat = Math.min(minLat, lat);
+      maxLat = Math.max(maxLat, lat);
+    }
+    if (minLon >= -56 && maxLon <= -50 && minLat >= 1 && maxLat <= 7) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export default function GlobeMap() {
   const countries = useCountriesData();
   const globeRef = useRef<any>(null);
@@ -28,6 +53,7 @@ export default function GlobeMap() {
   const [tripResultCountry, setTripResultCountry] = useState<CountryFeature | null>(null);
   const [isTripBlinkOn, setIsTripBlinkOn] = useState(false);
   const [isTripSuggestionOpen, setIsTripSuggestionOpen] = useState(false);
+  const [tripRevealNonce, setTripRevealNonce] = useState(0);
 
   const {
     visitedCountries,
@@ -77,6 +103,7 @@ export default function GlobeMap() {
     (d: object) => {
       if (!isUserPlanet) return undefined;
       const feat = d as CountryFeature;
+      if (isNorthBrazilCoastalFragment(feat)) return undefined;
       const code = countryVisitKey(feat.properties);
       const isVisited =
         visitedCountries.has(code) || hasAnyVisitedLandmarkForCountry(code, visitedLandmarks);
@@ -104,6 +131,9 @@ export default function GlobeMap() {
         return "#94c5ff";
       }
       if (isUserPlanet) {
+        if (isNorthBrazilCoastalFragment(feat)) {
+          return "#ffffff";
+        }
         if (isVisited) {
           const stored = countryFillColors[code];
           return stored ? resolveGlobeCountryFill(stored) : DEFAULT_VISITED_COUNTRY_COLOR;
@@ -271,6 +301,7 @@ export default function GlobeMap() {
           focusDurationMs
         );
         await wait(focusDurationMs + 40);
+        setTripRevealNonce((n) => n + 1);
         setTripResultCountry(randomCountry);
         setHoverD(randomCountry);
       }
@@ -417,6 +448,12 @@ export default function GlobeMap() {
           onCountryFillColorReset={() =>
             resetVisitCountryFillColor(countryVisitKey(selectedCountry.properties))
           }
+        />
+      )}
+      {tripResultCountry && (
+        <TripInterestingFacts
+          tripResetKey={`${countryVisitKey(tripResultCountry.properties)}-${tripRevealNonce}`}
+          countryName={tripResultCountry.properties.ADMIN}
         />
       )}
       {isTripSuggestionOpen && tripResultCountry && (

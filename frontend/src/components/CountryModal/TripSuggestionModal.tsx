@@ -1,7 +1,7 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import type { CountryFeature } from "../../types/country";
 import { useLandmarksForCountry } from "../../hooks/useLandmarksForCountry";
-import { getCountryMeta } from "../../lib/countryMeta";
+import { fetchCountryMeta, type CountryMetaDto } from "../../lib/api/countryMeta";
 
 type Props = {
   country: CountryFeature;
@@ -12,7 +12,30 @@ export function TripSuggestionModal({ country, onClose }: Props) {
   const isoA2 = country.properties.ISO_A2;
   const name = country.properties.ADMIN;
   const { landmarks, landmarksReady, landmarksError } = useLandmarksForCountry(isoA2, name);
-  const meta = getCountryMeta(name);
+  const [meta, setMeta] = useState<CountryMetaDto | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadMeta() {
+      try {
+        const data = await fetchCountryMeta(isoA2, name);
+        if (!cancelled) {
+          setMeta(data);
+        }
+      } catch {
+        if (!cancelled) {
+          setMeta(null);
+        }
+      }
+    }
+
+    setMeta(null);
+    void loadMeta();
+    return () => {
+      cancelled = true;
+    };
+  }, [isoA2, name]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
