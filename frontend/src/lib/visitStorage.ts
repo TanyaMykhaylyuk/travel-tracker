@@ -141,6 +141,19 @@ export function getVisitedLandmarksSet(): Set<string> {
   }
 }
 
+export function getEffectivelyVisitedCountriesSet(): Set<string> {
+  const effective = new Set(getVisitedCountriesSet());
+  const visitedLandmarks = getVisitedLandmarksSet();
+
+  for (const landmarkKey of visitedLandmarks) {
+    const separatorIndex = landmarkKey.indexOf(":");
+    if (separatorIndex <= 0) continue;
+    effective.add(landmarkKey.slice(0, separatorIndex));
+  }
+
+  return effective;
+}
+
 export function saveVisitedLandmarksSet(visited: Set<string>): void {
   localStorage.setItem(VISITED_LANDMARKS_KEY, JSON.stringify([...visited]));
 }

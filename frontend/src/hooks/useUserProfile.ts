@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   getCountryFillColors,
+  getEffectivelyVisitedCountriesSet,
   getVisitedCountriesSet,
   getVisitedLandmarksSet,
 } from "../lib/visitStorage";
@@ -187,6 +188,7 @@ export function useUserProfile(open: boolean, onClose: () => void) {
   const displayName = profile.displayName || "Your name";
   const handleLine = profile.handle ? `@${profile.handle}` : "@username";
   const bioText = profile.bio || "No bio yet.";
+  const visitedCountriesCount = getEffectivelyVisitedCountriesSet().size;
 
   return {
     fileInputRef,
@@ -206,6 +208,7 @@ export function useUserProfile(open: boolean, onClose: () => void) {
     displayName,
     handleLine,
     bioText,
+    visitedCountriesCount,
     accountSecured,
     handleAuthed,
     handleLogout,

@@ -40,6 +40,7 @@ export default function UserProfilePanel({ open, onClose }: Props) {
     displayName,
     handleLine,
     bioText,
+    visitedCountriesCount,
     accountSecured,
     handleAuthed,
     handleLogout,
@@ -181,6 +182,7 @@ export default function UserProfilePanel({ open, onClose }: Props) {
                     profile={profile}
                     displayName={displayName}
                     handleLine={handleLine}
+                    visitedCountriesCount={visitedCountriesCount}
                     bioText={bioText}
                   />
                 )}

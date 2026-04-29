@@ -4,10 +4,17 @@ type Props = {
   profile: ProfileData;
   displayName: string;
   handleLine: string;
+  visitedCountriesCount: number;
   bioText: string;
 };
 
-export function ProfileReadView({ profile, displayName, handleLine, bioText }: Props) {
+export function ProfileReadView({
+  profile,
+  displayName,
+  handleLine,
+  visitedCountriesCount,
+  bioText,
+}: Props) {
   return (
     <>
       <div className="flex items-center gap-2">
@@ -25,6 +32,7 @@ export function ProfileReadView({ profile, displayName, handleLine, bioText }: P
       <p className={`mt-1 text-sm ${profile.handle ? "text-zinc-500" : "text-zinc-600 italic"}`}>
         {handleLine}
       </p>
+      <p className="mt-1 text-sm text-zinc-500">Number of visited countries: {visitedCountriesCount}</p>
 
       <section className="mt-8 pb-8">
         <h4 className="text-xs font-semibold uppercase tracking-wide text-zinc-600">Bio</h4>
