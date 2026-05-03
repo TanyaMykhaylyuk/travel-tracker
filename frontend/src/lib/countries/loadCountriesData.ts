@@ -6,7 +6,12 @@ export async function loadCountriesData(): Promise<CountriesData> {
     if (res.ok) {
       const data = (await res.json()) as Partial<CountriesData>;
       if (Array.isArray(data.features)) {
-        return { features: data.features };
+        return {
+          features: data.features,
+          travelProgressUniverse: Array.isArray(data.travelProgressUniverse)
+            ? data.travelProgressUniverse
+            : undefined,
+        };
       }
     }
   } catch {

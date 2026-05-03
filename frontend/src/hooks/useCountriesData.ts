@@ -3,7 +3,10 @@ import { loadCountriesData } from "../lib/countries/loadCountriesData";
 import type { CountriesData } from "../types/country";
 
 export function useCountriesData(): CountriesData {
-  const [countries, setCountries] = useState<CountriesData>({ features: [] });
+  const [countries, setCountries] = useState<CountriesData>({
+    features: [],
+    travelProgressUniverse: undefined,
+  });
 
   useEffect(() => {
     void loadCountriesData().then(setCountries);

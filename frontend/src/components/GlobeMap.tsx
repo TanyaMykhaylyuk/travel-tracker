@@ -5,6 +5,7 @@ import CountryModal from "./CountryModal";
 import { TripInterestingFacts } from "./CountryModal/TripInterestingFacts";
 import { TripSuggestionModal } from "./CountryModal/TripSuggestionModal";
 import UserProfilePanel from "./UserProfilePanel";
+import { VisitedCountriesProgressRing } from "./VisitedCountriesProgressRing";
 import type { CountryFeature, CountryWithGeometry } from "../types/country";
 import { countryVisitKey } from "../lib/visitCountryKey";
 import { buildGlobePolygonsData } from "../lib/geo/crimeaReassign";
@@ -17,6 +18,7 @@ import {
   isFancyShaderCountryFill,
   resolveGlobeCountryFill,
 } from "../lib/visitStorage";
+import { normalizeGlobeAdm0ToTravelCca3 } from "../lib/geo/adm0TravelNormalize";
 
 function isNorthBrazilCoastalFragment(feature: CountryFeature): boolean {
   const geometry = (feature as CountryWithGeometry).geometry;
@@ -87,6 +89,65 @@ export default function GlobeMap() {
       }),
     [polygonsData, visitedCountries, visitedLandmarks]
   );
+
+  const travelProgressUniverse = useMemo(() => {
+    const codes = countries.travelProgressUniverse;
+    if (codes?.length) return new Set(codes);
+    return null;
+  }, [countries.travelProgressUniverse]);
+
+  const countriesVisitProgress = useMemo(() => {
+    const norm = normalizeGlobeAdm0ToTravelCca3;
+
+    if (!travelProgressUniverse || travelProgressUniverse.size === 0) {
+      const total = polygonsData.length;
+      if (total === 0) return { visited: 0, total: 0, percent: 0 };
+      let visited = 0;
+      for (const country of polygonsData) {
+        const code = countryVisitKey(country.properties);
+        if (
+          visitedCountries.has(code) ||
+          hasAnyVisitedLandmarkForCountry(code, visitedLandmarks)
+        ) {
+          visited += 1;
+        }
+      }
+      return {
+        visited,
+        total,
+        percent: Math.min(100, Math.round((visited / total) * 100)),
+      };
+    }
+
+    const total = travelProgressUniverse.size;
+    const visitedCanon = new Set<string>();
+
+    for (const country of polygonsData) {
+      const code = countryVisitKey(country.properties);
+      if (
+        !(visitedCountries.has(code) || hasAnyVisitedLandmarkForCountry(code, visitedLandmarks))
+      ) {
+        continue;
+      }
+      visitedCanon.add(norm(code));
+    }
+
+    for (const code of visitedCountries) {
+      const nk = norm(code);
+      if (travelProgressUniverse.has(nk)) visitedCanon.add(nk);
+    }
+
+    for (const lk of visitedLandmarks) {
+      const sep = lk.indexOf(":");
+      if (sep <= 0) continue;
+      const nk = norm(lk.slice(0, sep));
+      if (travelProgressUniverse.has(nk)) visitedCanon.add(nk);
+    }
+
+    const visited = visitedCanon.size;
+    const percent = Math.min(100, Math.round((visited / total) * 100));
+    return { visited, total, percent };
+  }, [travelProgressUniverse, polygonsData, visitedCountries, visitedLandmarks]);
 
   useEffect(() => {
     if (!hasMetallicOnGlobe) return;
@@ -393,6 +454,14 @@ export default function GlobeMap() {
           </button>
           <UserProfilePanel open={profileOpen} onClose={() => setProfileOpen(false)} />
         </>
+      )}
+      {isUserPlanet && (
+        <VisitedCountriesProgressRing
+          percent={countriesVisitProgress.percent}
+          visited={countriesVisitProgress.visited}
+          total={countriesVisitProgress.total}
+          className="absolute bottom-40 right-6 z-20 rounded-2xl border border-slate-800/90 bg-slate-950/75 px-3 py-2 shadow-lg backdrop-blur-sm"
+        />
       )}
       {isUserPlanet && (
         <Button

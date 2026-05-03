@@ -32,6 +32,7 @@ export type CountryPhotosResponse = {
 
 export type CountriesFeaturesResponse = {
   features: unknown
+  travelProgressUniverse: string[]
 }
 
 export type LandmarkItemDto = {

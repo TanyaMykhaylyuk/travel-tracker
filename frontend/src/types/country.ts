@@ -24,4 +24,5 @@ export type CountryWithGeometry = CountryFeature & {
 
 export type CountriesData = {
   features: CountryFeature[];
+  travelProgressUniverse?: string[];
 };
