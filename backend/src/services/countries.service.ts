@@ -1,7 +1,6 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { buildTravelProgressUniverseAdm0Codes } from '../lib/travelProgressUniverse'
-import { CountryLandmarkModel } from '../models/CountryLandmark'
 import { HttpError } from '../utils/httpError'
 
 type GeoJsonLike = {
@@ -78,24 +77,7 @@ export type CountriesListPayload = {
 
 export async function getCountriesListPayload(): Promise<CountriesListPayload> {
   const features = await loadAndCacheFeatures()
-
-  let landmarkIso2List: string[] | null = null
-  try {
-    const raw = await CountryLandmarkModel.distinct<string>('isoA2')
-    const cleaned = raw
-      .filter((x): x is string => typeof x === 'string')
-      .map((s) => s.trim().toUpperCase())
-      .filter((s) => /^[A-Z]{2}$/.test(s))
-    if (cleaned.length > 0) {
-      landmarkIso2List = [...new Set(cleaned)]
-    }
-  } catch {
-    landmarkIso2List = null
-  }
-
-  const travelProgressUniverse = buildTravelProgressUniverseAdm0Codes(features, {
-    landmarkIso2List,
-  })
+  const travelProgressUniverse = buildTravelProgressUniverseAdm0Codes()
 
   return {
     features,

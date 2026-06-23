@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   getCountryFillColors,
-  getEffectivelyVisitedCountriesSet,
   getVisitedCountriesSet,
   getVisitedLandmarksSet,
 } from "../lib/visitStorage";
+import { countRecognizedVisitedCountries } from "../lib/geo/travelProgress";
 import {
   fetchUser,
   getStoredUserId,
@@ -21,7 +21,12 @@ const emptyProfile: ProfileData = {
   bio: "",
 };
 
-export function useUserProfile(open: boolean, onClose: () => void) {
+export function useUserProfile(
+  open: boolean,
+  onClose: () => void,
+  travelProgressUniverse?: Set<string> | null,
+  visitEpoch = 0
+) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [photoError, setPhotoError] = useState<string | null>(null);
@@ -188,7 +193,15 @@ export function useUserProfile(open: boolean, onClose: () => void) {
   const displayName = profile.displayName || "Your name";
   const handleLine = profile.handle ? `@${profile.handle}` : "@username";
   const bioText = profile.bio || "No bio yet.";
-  const visitedCountriesCount = getEffectivelyVisitedCountriesSet().size;
+  const visitedCountriesCount = useMemo(
+    () =>
+      countRecognizedVisitedCountries(
+        travelProgressUniverse,
+        getVisitedCountriesSet(),
+        getVisitedLandmarksSet()
+      ),
+    [travelProgressUniverse, visitEpoch]
+  );
 
   return {
     fileInputRef,

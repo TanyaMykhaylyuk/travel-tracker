@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { CountryWithGeometry } from "../../types/country";
+import { formatCountryDisplayName } from "../../lib/geo/travelProgress";
 import { countryVisitKey } from "../../lib/visitCountryKey";
 import { DEFAULT_VISITED_COUNTRY_COLOR, isHexCountryFill } from "../../lib/visitStorage";
 import { useLandmarksForCountry } from "../../hooks/useLandmarksForCountry";
@@ -13,6 +14,7 @@ type Props = {
   country: CountryWithGeometry;
   visitEpoch: number;
   visitsSyncReady?: boolean;
+  travelProgressUniverse?: Set<string> | null;
   onClose: () => void;
   isCountryVisited: boolean;
   onToggleCountryVisited: () => void;
@@ -26,6 +28,7 @@ export default function CountryModal({
   country,
   visitEpoch,
   visitsSyncReady = true,
+  travelProgressUniverse,
   onClose,
   isCountryVisited,
   onToggleCountryVisited,
@@ -37,12 +40,17 @@ export default function CountryModal({
   const code = country.properties.ISO_A2;
   const photoCountryCode = country.properties.ADM0_A3;
   const visitKey = countryVisitKey(country.properties);
-  const name = country.properties.ADMIN;
+  const countryName = country.properties.ADMIN;
+  const displayName = formatCountryDisplayName(
+    countryName,
+    visitKey,
+    travelProgressUniverse
+  );
   const [mapColorOpen, setMapColorOpen] = useState(false);
   const [photoModalOpen, setPhotoModalOpen] = useState(false);
   const mapColorToolsRef = useRef<HTMLDivElement>(null);
 
-  const { landmarks, landmarksReady, landmarksError } = useLandmarksForCountry(code, name);
+  const { landmarks, landmarksReady, landmarksError } = useLandmarksForCountry(code, countryName);
   const { toggleVisited, isVisited } = useLandmarkVisits(
     visitKey,
     visitEpoch,
@@ -100,7 +108,7 @@ export default function CountryModal({
         <div className={styles.header}>
           <div className={styles.headerMain}>
             <h2 id="modal-title" className={styles.title}>
-              {name}
+              {displayName}
             </h2>
             <div className={styles.headerActionsRow}>
               <div className="flex items-center justify-between gap-4 py-0.5 min-w-0 flex-1">
@@ -326,7 +334,7 @@ export default function CountryModal({
       {photoModalOpen && (
         <CountryPhotoModal
           countryCode={photoCountryCode}
-          countryName={name}
+          countryName={countryName}
           onClose={() => setPhotoModalOpen(false)}
         />
       )}

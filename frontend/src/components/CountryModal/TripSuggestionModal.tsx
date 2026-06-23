@@ -3,15 +3,24 @@ import type { CountryFeature } from "../../types/country";
 import { useLandmarksForCountry } from "../../hooks/useLandmarksForCountry";
 import { fetchCountryMeta, type CountryMetaDto } from "../../lib/api/countryMeta";
 
+import { formatCountryDisplayName } from "../../lib/geo/travelProgress";
+import { countryVisitKey } from "../../lib/visitCountryKey";
+
 type Props = {
   country: CountryFeature;
+  travelProgressUniverse?: Set<string> | null;
   onClose: () => void;
 };
 
-export function TripSuggestionModal({ country, onClose }: Props) {
+export function TripSuggestionModal({ country, travelProgressUniverse, onClose }: Props) {
   const isoA2 = country.properties.ISO_A2;
-  const name = country.properties.ADMIN;
-  const { landmarks, landmarksReady, landmarksError } = useLandmarksForCountry(isoA2, name);
+  const countryName = country.properties.ADMIN;
+  const displayName = formatCountryDisplayName(
+    countryName,
+    countryVisitKey(country.properties),
+    travelProgressUniverse
+  );
+  const { landmarks, landmarksReady, landmarksError } = useLandmarksForCountry(isoA2, countryName);
   const [meta, setMeta] = useState<CountryMetaDto | null>(null);
 
   useEffect(() => {
@@ -19,7 +28,7 @@ export function TripSuggestionModal({ country, onClose }: Props) {
 
     async function loadMeta() {
       try {
-        const data = await fetchCountryMeta(isoA2, name);
+        const data = await fetchCountryMeta(isoA2, countryName);
         if (!cancelled) {
           setMeta(data);
         }
@@ -35,7 +44,7 @@ export function TripSuggestionModal({ country, onClose }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [isoA2, name]);
+  }, [isoA2, countryName]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -69,7 +78,7 @@ export function TripSuggestionModal({ country, onClose }: Props) {
                 id="trip-suggestion-title"
                 className="text-2xl font-semibold text-white"
               >
-                {name}
+                {displayName}
               </h2>
               {meta && (
                 <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-xs sm:text-sm text-cyan-100/90">

@@ -8,6 +8,8 @@ import { ProfileReadView } from "./ProfileReadView";
 type Props = {
   open: boolean;
   onClose: () => void;
+  travelProgressUniverse?: Set<string> | null;
+  visitEpoch?: number;
 };
 
 type PanelSection = "profile" | "account";
@@ -15,7 +17,12 @@ type PanelSection = "profile" | "account";
 const tabBase =
   "shrink-0 rounded-md px-3 py-1.5 text-sm font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-500";
 
-export default function UserProfilePanel({ open, onClose }: Props) {
+export default function UserProfilePanel({
+  open,
+  onClose,
+  travelProgressUniverse,
+  visitEpoch = 0,
+}: Props) {
   const [section, setSection] = useState<PanelSection>("profile");
 
   useEffect(() => {
@@ -44,7 +51,7 @@ export default function UserProfilePanel({ open, onClose }: Props) {
     accountSecured,
     handleAuthed,
     handleLogout,
-  } = useUserProfile(open, onClose);
+  } = useUserProfile(open, onClose, travelProgressUniverse, visitEpoch);
 
   if (!open) return null;
 

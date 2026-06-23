@@ -18,7 +18,10 @@ import {
   isFancyShaderCountryFill,
   resolveGlobeCountryFill,
 } from "../lib/visitStorage";
-import { normalizeGlobeAdm0ToTravelCca3 } from "../lib/geo/adm0TravelNormalize";
+import {
+  computeCountriesVisitProgress,
+  formatCountryDisplayName,
+} from "../lib/geo/travelProgress";
 
 function isNorthBrazilCoastalFragment(feature: CountryFeature): boolean {
   const geometry = (feature as CountryWithGeometry).geometry;
@@ -96,58 +99,16 @@ export default function GlobeMap() {
     return null;
   }, [countries.travelProgressUniverse]);
 
-  const countriesVisitProgress = useMemo(() => {
-    const norm = normalizeGlobeAdm0ToTravelCca3;
-
-    if (!travelProgressUniverse || travelProgressUniverse.size === 0) {
-      const total = polygonsData.length;
-      if (total === 0) return { visited: 0, total: 0, percent: 0 };
-      let visited = 0;
-      for (const country of polygonsData) {
-        const code = countryVisitKey(country.properties);
-        if (
-          visitedCountries.has(code) ||
-          hasAnyVisitedLandmarkForCountry(code, visitedLandmarks)
-        ) {
-          visited += 1;
-        }
-      }
-      return {
-        visited,
-        total,
-        percent: Math.min(100, Math.round((visited / total) * 100)),
-      };
-    }
-
-    const total = travelProgressUniverse.size;
-    const visitedCanon = new Set<string>();
-
-    for (const country of polygonsData) {
-      const code = countryVisitKey(country.properties);
-      if (
-        !(visitedCountries.has(code) || hasAnyVisitedLandmarkForCountry(code, visitedLandmarks))
-      ) {
-        continue;
-      }
-      visitedCanon.add(norm(code));
-    }
-
-    for (const code of visitedCountries) {
-      const nk = norm(code);
-      if (travelProgressUniverse.has(nk)) visitedCanon.add(nk);
-    }
-
-    for (const lk of visitedLandmarks) {
-      const sep = lk.indexOf(":");
-      if (sep <= 0) continue;
-      const nk = norm(lk.slice(0, sep));
-      if (travelProgressUniverse.has(nk)) visitedCanon.add(nk);
-    }
-
-    const visited = visitedCanon.size;
-    const percent = Math.min(100, Math.round((visited / total) * 100));
-    return { visited, total, percent };
-  }, [travelProgressUniverse, polygonsData, visitedCountries, visitedLandmarks]);
+  const countriesVisitProgress = useMemo(
+    () =>
+      computeCountriesVisitProgress(
+        travelProgressUniverse,
+        polygonsData,
+        visitedCountries,
+        visitedLandmarks
+      ),
+    [travelProgressUniverse, polygonsData, visitedCountries, visitedLandmarks]
+  );
 
   useEffect(() => {
     if (!hasMetallicOnGlobe) return;
@@ -416,9 +377,14 @@ export default function GlobeMap() {
         polygonLabel={(d: object) => {
           const feat = d as CountryFeature;
           const props = feat.properties;
+          const label = formatCountryDisplayName(
+            props.ADMIN,
+            countryVisitKey(props),
+            travelProgressUniverse
+          );
           return `
           <div>
-            <div><b>${props.ADMIN} (${props.ISO_A2}):</b></div>
+            <div><b>${label} (${props.ISO_A2}):</b></div>
             <div>GDP: <i>${props.GDP_MD_EST}</i> M$</div>
             <div>Population: <i>${props.POP_EST}</i></div>
           </div>
@@ -452,7 +418,12 @@ export default function GlobeMap() {
               <circle cx="12" cy="7" r="4" />
             </svg>
           </button>
-          <UserProfilePanel open={profileOpen} onClose={() => setProfileOpen(false)} />
+          <UserProfilePanel
+            open={profileOpen}
+            onClose={() => setProfileOpen(false)}
+            travelProgressUniverse={travelProgressUniverse}
+            visitEpoch={visitEpoch}
+          />
         </>
       )}
       {isUserPlanet && (
@@ -497,6 +468,7 @@ export default function GlobeMap() {
         <CountryModal
           country={selectedCountry}
           visitEpoch={visitEpoch}
+          travelProgressUniverse={travelProgressUniverse}
           visitsSyncReady={visitsSyncReady}
           onClose={() => setSelectedCountry(null)}
           isCountryVisited={
@@ -528,6 +500,7 @@ export default function GlobeMap() {
       {isTripSuggestionOpen && tripResultCountry && (
         <TripSuggestionModal
           country={tripResultCountry}
+          travelProgressUniverse={travelProgressUniverse}
           onClose={closeTripSuggestion}
         />
       )}
